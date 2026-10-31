@@ -1,0 +1,134 @@
+{
+  "meeting_date": "2026-11-02",
+  "extraction": [
+    {
+      "id": "date-self-correction",
+      "transcript": "Priya: Okay so um the launch, we're doing Friday... no wait, Monday the 16th. That's final.\nRaj: Cool. I'll update the release checklist by Thursday.",
+      "decisions": [{"must_contain": ["16"], "must_not_contain": ["Friday"]}],
+      "tasks": [{"keywords": ["release", "checklist"], "owner": "Raj", "deadline": "2026-11-05"}]
+    },
+    {
+      "id": "price-self-correction",
+      "transcript": "Mei: For pricing we, uh, we landed on $29 a month, sorry, $34 a month for the team plan.\nPriya: Mei, can you update the pricing page by end of week?",
+      "decisions": [{"must_contain": ["$34"], "must_not_contain": ["$29"]}],
+      "tasks": [{"keywords": ["pricing", "page"], "owner": "Mei", "deadline": "2026-11-06"}]
+    },
+    {
+      "id": "owner-self-correction",
+      "transcript": "Raj: The API docs, Sam will take it, actually no, Diego will write the API docs by next Wednesday.\nDiego: Yep, on it.",
+      "decisions": [],
+      "tasks": [{"keywords": ["api", "docs"], "owner": "Diego", "deadline": "2026-11-11"}]
+    },
+    {
+      "id": "recap-style-unlabelled",
+      "transcript": "Quick recap of the design review. Priya said we're going with the blue theme for the dashboard. Sam volunteered to export the icon set by tomorrow. Diego said he'll fix the login bug by Friday. Someone needs to book the usability sessions.",
+      "decisions": [{"must_contain": ["blue"], "must_not_contain": []}],
+      "tasks": [
+        {"keywords": ["icon"], "owner": "Sam", "deadline": "2026-11-03"},
+        {"keywords": ["login", "bug"], "owner": "Diego", "deadline": "2026-11-06"},
+        {"keywords": ["usability"], "owner": null, "deadline": null}
+      ]
+    },
+    {
+      "id": "rejected-proposal",
+      "transcript": "Raj: We talked about moving to Kubernetes but honestly no, not this quarter. We're staying on Heroku.\nPriya: Agreed, Heroku for now.",
+      "decisions": [{"must_contain": ["Heroku"], "must_not_contain": []}],
+      "tasks": []
+    },
+    {
+      "id": "filler-heavy",
+      "transcript": "Sam: So, like, um, you know, basically the, the onboarding flow is, uh, kind of done? I mean, I'll, um, I'll ship the onboarding flow to staging by, like, Wednesday.",
+      "decisions": [],
+      "tasks": [{"keywords": ["onboarding"], "owner": "Sam", "deadline": "2026-11-04"}]
+    },
+    {
+      "id": "relative-dates",
+      "transcript": "Priya: Mei, can you draft the press release by end of month? Raj, the security audit is due in two weeks, you own that. And I'll send the investor update tomorrow.",
+      "decisions": [],
+      "tasks": [
+        {"keywords": ["press", "release"], "owner": "Mei", "deadline": "2026-11-30"},
+        {"keywords": ["security", "audit"], "owner": "Raj", "deadline": "2026-11-16"},
+        {"keywords": ["investor"], "owner": "Priya", "deadline": "2026-11-03"}
+      ]
+    },
+    {
+      "id": "webvtt-export",
+      "transcript": "WEBVTT\n\n1\n00:00:01.000 --> 00:00:04.000\n<v Diego>We decided to use Postgres for analytics too.</v>\n\n2\n00:00:05.000 --> 00:00:08.000\n<v Mei>I'll set up the analytics dashboard by Friday.</v>",
+      "decisions": [{"must_contain": ["Postgres"], "must_not_contain": []}],
+      "tasks": [{"keywords": ["analytics", "dashboard"], "owner": "Mei", "deadline": "2026-11-06"}]
+    },
+    {
+      "id": "hedged-vs-decided",
+      "transcript": "Raj: We should probably look at caching at some point. Maybe Redis? Not decided.\nPriya: Let's lock it in: the beta goes to 50 customers on November 20th.",
+      "decisions": [{"must_contain": ["50"], "must_not_contain": ["Redis"]}],
+      "tasks": []
+    },
+    {
+      "id": "double-correction",
+      "transcript": "Mei: The webinar is on the 12th, no wait, the 19th. And Sam's hosting, sorry, I mean Raj is hosting.\nRaj: Yep, I'll prep the webinar slides by the 17th.",
+      "decisions": [{"must_contain": ["19"], "must_not_contain": ["12th"]}],
+      "tasks": [{"keywords": ["webinar", "slides"], "owner": "Raj", "deadline": "2026-11-17"}]
+    },
+    {
+      "id": "one-paragraph-dictation",
+      "transcript": "Priya: So the launch is December 7th now. Diego: I will write the security rules by Tuesday. Sam, can you finalize the onboarding checklist by tomorrow?",
+      "decisions": [{"must_contain": ["December 7"], "must_not_contain": []}],
+      "tasks": [
+        {"keywords": ["security", "rules"], "owner": "Diego", "deadline": "2026-11-03"},
+        {"keywords": ["onboarding", "checklist"], "owner": "Sam", "deadline": "2026-11-03"}
+      ]
+    },
+    {
+      "id": "tech-self-correction",
+      "transcript": "Raj: For the database we're going with Mongo, sorry, Postgres. Final answer.\nRaj: I'll write the migration scripts by end of week.",
+      "decisions": [{"must_contain": ["Postgres"], "must_not_contain": []}],
+      "tasks": [{"keywords": ["migration"], "owner": "Raj", "deadline": "2026-11-06"}]
+    }
+  ],
+  "conflicts": [
+    {
+      "id": "silent-reversals",
+      "earlier": [
+        {"text": "We're launching on November 23rd", "topic": "launch date"},
+        {"text": "We're going with Postgres", "topic": "database"},
+        {"text": "Pricing is $25 a month per seat", "topic": "pricing"}
+      ],
+      "new": [
+        {"text": "Launch is December 7th", "topic": "launch date"},
+        {"text": "We're using Firebase for the backend", "topic": "database"},
+        {"text": "Pricing stays at $25 a seat", "topic": "pricing"}
+      ],
+      "expected_conflicts": ["launch date", "database"]
+    },
+    {
+      "id": "design-change",
+      "earlier": [{"text": "Use the blue theme for the dashboard", "topic": "design"}],
+      "new": [{"text": "The dashboard will use the green theme", "topic": "design"}],
+      "expected_conflicts": ["design"]
+    },
+    {
+      "id": "unrelated-topics",
+      "earlier": [{"text": "The beta goes to 50 customers on November 20th", "topic": "beta launch"}],
+      "new": [{"text": "The beta invite email goes out on Monday", "topic": "marketing"}],
+      "expected_conflicts": []
+    },
+    {
+      "id": "acknowledged-move",
+      "earlier": [{"text": "We're staying on Heroku", "topic": "hosting"}],
+      "new": [{"text": "We're moving hosting to AWS next sprint", "topic": "hosting"}],
+      "expected_conflicts": ["hosting"]
+    },
+    {
+      "id": "different-aspect",
+      "earlier": [{"text": "The Pro plan is $34 a month", "topic": "pricing"}],
+      "new": [{"text": "The free tier is limited to 3 users", "topic": "pricing"}],
+      "expected_conflicts": []
+    },
+    {
+      "id": "restatement",
+      "earlier": [{"text": "The weekly sync moves to Tuesdays", "topic": "meetings"}],
+      "new": [{"text": "The weekly sync stays on Tuesdays, now 30 minutes", "topic": "meetings"}],
+      "expected_conflicts": []
+    }
+  ]
+}

@@ -42,7 +42,7 @@ def fake_llm(system, prompt):
         pairs = [line.split() for line in prompt.splitlines() if line.startswith("PAIR")]
         return json.dumps({"judgments": [
             {"new_index": int(p[1].split("=")[1]), "old_id": int(p[2].split("=")[1]),
-             "verdict": "contradiction", "explanation": "Silently reverses the kickoff decision."}
+             "verdict": "contradiction", "shared_subject": "decision", "explanation": "Silently reverses the kickoff decision."}
             for p in pairs]})
     if system.startswith(digest.DIGEST_SYSTEM[:40]):
         facts = json.loads(prompt.split("\n", 1)[1])

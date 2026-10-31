@@ -77,13 +77,15 @@ _DECISION_CUES = re.compile(
     r"agreed|we agree|final answer|locking in|lock in|settled on|it'?s official|we'?re launching|"
     r"we'?ll launch|launch is|launching on|we'?ll use|we'?re using|we will use|pricing is|price is|"
     r"we'?re moving to|moving to|switching to|we'?ll switch|instead of|is going to be|will be priced|"
-    r"stays at|staying at|sticking with|no change)\b",
+    r"stays at|staying at|sticking with|staying on|no change|landed on|we'?re doing|lock(?:ing)? it in|"
+    r"the plan is|goes to \d+|(?:is|are) (?:on|set for) (?:the )?\d+|will be on (?:the )?\d+)",
     re.I,
 )
 _STRONG_CUES = re.compile(r"\b(decided|final|agreed|locking in|lock in|official|settled)\b", re.I)
 _HEDGES = re.compile(r"\b(probably|maybe|i think|tentatively|might|for now|roughly)\b", re.I)
 _SELF_OWNER = re.compile(r"\b(i'?ll|i will|i can|i'?m going to|i'?m gonna|let me|i'?ll take|i'?ll own)\b", re.I)
-_ASKED_OWNER = re.compile(r"\b([A-Z][a-z]+),? (?:can you|could you|would you|please|will you)\b")
+_ASKED_OWNER = re.compile(r"\b([A-Z][a-z]+),? (?:can you|could you|would you|please|will you)\b"
+                          r"|\b([A-Z][a-z]+), [^.?!]*\byou (?:own|take|have|handle|lead)\b")
 _NAMED_OWNER = re.compile(r"\b([A-Z][a-z]+) (?:will|is going to|to|should|needs to|can|owns|is on|takes)\b")
 # Recap-style dictation: "Diego said he'll write the rules", "Mei volunteered to send it".
 _REPORTED_OWNER = re.compile(
@@ -94,7 +96,8 @@ _REPORTED_SPEAKER = re.compile(r"([A-Z][a-z]+) (?:said|says|mentioned|announced|
 _ACTION_CUES = re.compile(
     r"\b(i'?ll|i will|i can|i'?m going to|let me|can you|could you|please|needs to|will|should|"
     r"action item|to-?do|follow up|make sure|take care of|owns|is on|"
-    r"he'?ll|she'?ll|they'?ll|offered to|volunteered to|promised to|agreed to|committed to)\b",
+    r"he'?ll|she'?ll|they'?ll|offered to|volunteered to|promised to|agreed to|committed to|"
+    r"you own|is due (?:by|in|on))\b",
     re.I,
 )
 _NOT_NAMES = {"We", "I", "It", "That", "This", "There", "They", "You", "Someone", "Somebody",
@@ -105,8 +108,8 @@ _LEAD_INS = re.compile(r"^(?:(?:oh|and|but|so|also|then|okay|ok|alright|right|ye
 def _owner_for(sentence: str, speaker: str, people: set[str]) -> str | None:
     """Earliest ownership cue wins: in "I'll write it so Raj can review", the owner is the speaker."""
     found: list[tuple[int, str | None]] = []
-    if (m := _ASKED_OWNER.search(sentence)) and m[1] not in _NOT_NAMES:
-        found.append((m.start(), m[1]))
+    if (m := _ASKED_OWNER.search(sentence)) and (m[1] or m[2]) not in _NOT_NAMES:
+        found.append((m.start(), m[1] or m[2]))
     if (m := _NAMED_OWNER.search(sentence)) and m[1] not in _NOT_NAMES and (m[1] in people or not people):
         found.append((m.start(), m[1]))
     if m := _SELF_OWNER.search(sentence):

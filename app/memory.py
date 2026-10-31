@@ -14,7 +14,7 @@ import sqlite3
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from . import db, llm
 from .extraction import ExtractedDecision
@@ -26,6 +26,8 @@ RESOLUTIONS = ("supersede", "keep", "dismiss")
 class Judgment(BaseModel):
     new_index: int
     old_id: int
+    shared_subject: str = Field(
+        default="", description="The single thing BOTH decisions set (e.g. 'launch date'); empty if they set different things")
     verdict: Literal["contradiction", "supersession", "none"]
     explanation: str
 
@@ -116,6 +118,9 @@ For every (new decision, earlier decision) pair, return a verdict:
 - "none": compatible, a restatement, a refinement, or about a different aspect (Pro price vs free tier).
 explanation: ONE plain sentence naming both values and when the earlier one was made, e.g.
 "Product kickoff (Oct 19) set launch for Nov 23; this sets Dec 7 without mentioning the change."
+First fill shared_subject: the one specific thing both decisions set a value for (the launch date, the
+database, the Pro plan price). If they set different things that merely share a word (the beta launch
+date vs. when the beta invite email goes out), shared_subject is "" and the verdict must be "none".
 Return one judgment per pair, using the given new_index and old_id."""
 
 
@@ -142,7 +147,9 @@ _TECH = {
 }
 _VALUE_PATTERNS = {
     "date": re.compile(rf"\b(?:{_MONTHS})[a-z]*\.? \d{{1,2}}(?:st|nd|rd|th)?\b|\b\d{{4}}-\d{{2}}-\d{{2}}\b", re.I),
-    "price": re.compile(r"\$\d[\d,]*(?:\.\d+)?|\bfree\b", re.I),
+    # "free tier" is an aspect of pricing, not a price, so only amounts count.
+    "price": re.compile(r"\$\d[\d,]*(?:\.\d+)?", re.I),
+    "colour": re.compile(r"\b(?:red|orange|yellow|green|blue|purple|pink|black|white|gr[ae]y|teal|navy)\b", re.I),
     "technology": re.compile(rf"\b(?:{'|'.join(sorted(_TECH, key=len, reverse=True))})\b", re.I),
 }
 _CHANGE_CUES = re.compile(r"\b(moving|move|moved|switch|switching|instead|change|changing|pushed?|delay|"
@@ -184,7 +191,7 @@ def mock_judge(pairs: list[tuple[int, ExtractedDecision, dict]]) -> Judgments:
         kind = "supersession" if _CHANGE_CUES.search(new.text) else "contradiction"
         tail = "." if kind == "supersession" else " without acknowledging the change."
         out.append(Judgment(
-            new_index=i, old_id=old["id"], verdict=kind,
+            new_index=i, old_id=old["id"], verdict=kind, shared_subject=new.topic,
             explanation=(f"{old['meeting_title']} ({_short_date(old['meeting_date'])}) set the {new.topic} "
                          f"to {', '.join(ov[c].values())}; this meeting says {', '.join(nv[c].values())}{tail}"),
         ))
@@ -252,7 +259,8 @@ def detect_conflicts(meeting_id: int, meeting_date: date, decisions: list[Extrac
     seen = set()
     for j in result.judgments:
         key = (j.new_index, j.old_id)
-        if j.verdict == "none" or key not in valid or key in seen:
+        # A conflict needs both decisions to set the same subject; otherwise it's a false alarm.
+        if j.verdict == "none" or not j.shared_subject.strip() or key not in valid or key in seen:
             continue
         seen.add(key)
         new, _ = valid[key]

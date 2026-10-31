@@ -40,6 +40,23 @@ posted.
 <kbd>1</kbd>–<kbd>6</kbd> switch sections. On Review, <kbd>S</kbd> / <kbd>K</kbd> / <kbd>D</kbd> resolve the next open conflict.
 <kbd>Ctrl</kbd>+<kbd>Enter</kbd> extracts from the dictation box. Light and dark themes follow the system, or toggle from the palette.
 
+## Accuracy
+
+Measured on 12 hand-labelled messy meetings and 6 conflict scenarios (`eval/`), live Gemini, 3 runs pooled,
+no cached answers, 0 fallbacks:
+
+| | Live model | Offline rules* |
+|---|---|---|
+| Action items found / correct | 100% / 100% | 100% / 94% |
+| Owner · deadline correct | 100% · 100% | 100% · 100% |
+| Self-corrections resolved to final intent | 100% | 100% |
+| Conflicts caught · false alarms avoided | 100% · 100% | 100% · 100% |
+| Decisions found / correct | 100% / 79%† | 100% / 82% |
+
+\* The offline rules were tuned on these cases, so read that column as a regression suite.
+† "Incorrect" decisions are extras we didn't label, most of them defensible ("Raj is hosting the webinar").
+Full report with every miss: [`eval/RESULTS.md`](eval/RESULTS.md). Reproduce with `python eval/run_eval.py --runs 3`.
+
 ## Setup
 
 Requires Python 3.11+.

@@ -83,9 +83,21 @@ def test_llm_judge_output_is_validated_against_candidates(monkeypatch):
     mid = db.create_meeting("Live", "2026-10-30", "x", [], "", {})
     monkeypatch.setenv("LLM_API_KEY", "fake")
     reply = {"judgments": [
-        {"new_index": 0, "old_id": old["id"], "verdict": "supersession", "explanation": "Moved."},
-        {"new_index": 0, "old_id": 999, "verdict": "contradiction", "explanation": "Hallucinated id."},
+        {"new_index": 0, "old_id": old["id"], "verdict": "supersession", "shared_subject": "topic", "explanation": "Moved."},
+        {"new_index": 0, "old_id": 999, "verdict": "contradiction", "shared_subject": "topic", "explanation": "Hallucinated id."},
     ]}
     monkeypatch.setitem(llm._PROVIDERS, "gemini", lambda system, prompt: json.dumps(reply))
     out = memory.detect_conflicts(mid, date(2026, 10, 30), [_decision(old["text"] + " changed", old["topic"])])
     assert [(c["old_decision_id"], c["kind"]) for c in out] == [(old["id"], "supersession")]
+
+
+def test_judge_verdict_without_shared_subject_is_ignored(monkeypatch):
+    db.init_db()
+    workflow.load_demo(confirm_all=True)
+    old = memory.active_decisions()[0]
+    mid = db.create_meeting("Live", "2026-10-30", "x", [], "", {})
+    monkeypatch.setenv("LLM_API_KEY", "fake")
+    reply = {"judgments": [{"new_index": 0, "old_id": old["id"], "verdict": "contradiction",
+                            "shared_subject": "", "explanation": "Shares a word only."}]}
+    monkeypatch.setitem(llm._PROVIDERS, "gemini", lambda system, prompt: json.dumps(reply))
+    assert memory.detect_conflicts(mid, date(2026, 10, 30), [_decision(old["text"] + " email", old["topic"])]) == []
