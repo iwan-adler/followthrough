@@ -72,6 +72,11 @@ CREATE TABLE IF NOT EXISTS notifications (
     read INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS llm_cache (       -- identical prompt -> same validated answer
+    key TEXT PRIMARY KEY,
+    response TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS mock_tracker (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     action_item_id INTEGER REFERENCES action_items(id),

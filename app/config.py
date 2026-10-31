@@ -12,6 +12,8 @@ class Settings:
     llm_provider: str
     llm_api_key: str
     llm_model: str
+    llm_fallback_models: str
+    llm_cache: bool
     llm_max_retries: int
     github_token: str
     github_repo: str
@@ -27,6 +29,8 @@ def settings() -> Settings:
         llm_provider=env("LLM_PROVIDER", "gemini").strip().lower(),
         llm_api_key=env("LLM_API_KEY", "").strip(),
         llm_model=env("LLM_MODEL", "").strip(),
+        llm_fallback_models=env("LLM_FALLBACK_MODELS", ""),
+        llm_cache=env("LLM_CACHE", "true").strip().lower() not in ("0", "false", "no"),
         llm_max_retries=int(env("LLM_MAX_RETRIES", "3")),
         github_token=env("GITHUB_TOKEN", "").strip(),
         github_repo=env("GITHUB_REPO", "").strip(),

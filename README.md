@@ -60,8 +60,10 @@ Run the tests:
 |---|---|---|
 | `LLM_PROVIDER` | `gemini` | `gemini` or `groq` (both have free tiers) |
 | `LLM_API_KEY` | _empty_ | Free-tier key. Empty = deterministic mock |
-| `LLM_MODEL` | provider default | `gemini-2.5-flash` / `llama-3.3-70b-versatile` |
-| `LLM_MAX_RETRIES` | `3` | Retries on invalid JSON or network errors, then falls back to the mock |
+| `LLM_MODEL` | _empty_ | Model to try first; otherwise the built-in chain in `app/llm.py` |
+| `LLM_FALLBACK_MODELS` | built-in chain | Comma-separated models to fall back through. Busy (503/429/timeout) hands over immediately, retired (404) is skipped, the last model that worked goes first |
+| `LLM_MAX_RETRIES` | `3` | Passes over the chain when every model is busy, then the mock answers |
+| `LLM_CACHE` | `true` | Reuse the validated answer for an identical prompt. One rehearsal makes the demo load instantly |
 | `GITHUB_TOKEN` | _empty_ | Token with Issues write access. Empty = local mock tracker |
 | `GITHUB_REPO` | _empty_ | `owner/repo` for created issues |
 | `GITHUB_USER_MAP` | _empty_ | Optional `Priya=priya-gh,Raj=rajdev` to set issue assignees |
@@ -73,7 +75,9 @@ Free keys: Gemini at https://aistudio.google.com/apikey, Groq at https://console
 
 ## 3-minute demo script
 
-**Before you start:** server running, browser on New Meeting, Wispr Flow ready. Press **Reset**
+**Before you start:** server running, browser on New Meeting, Wispr Flow ready. With a key set,
+**rehearse once**: free-tier models are sometimes busy, and the response cache makes the second run
+instant with the same real-model output. New dictation still goes to the model live. Press **Reset**
 to start from the hero screen, then **Load demo meetings**, then go back to New Meeting.
 
 1. **The problem (0:00–0:15).** "Meeting 2 quietly undoes meeting 1, and the work built on the

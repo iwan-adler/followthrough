@@ -9,6 +9,11 @@ def isolated_env(tmp_path, monkeypatch):
     monkeypatch.setenv("LLM_API_KEY", "")
     monkeypatch.setenv("GITHUB_TOKEN", "")
     monkeypatch.setenv("SCHEDULER_ENABLED", "false")
+    monkeypatch.setenv("LLM_CACHE", "false")  # tests count provider calls; test_llm_chain covers the cache
+    from app import llm
+
+    llm._sticky.clear()  # model-chain state is per process; isolate tests from each other
+    llm._dead.clear()
 
 
 @pytest.fixture

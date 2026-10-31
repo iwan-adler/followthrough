@@ -22,7 +22,8 @@ class DigestNarrative(BaseModel):
 DIGEST_SYSTEM = """You write a short weekly digest for ONE teammate on a product team.
 Use ONLY the facts in the JSON you are given; never invent tasks, dates or decisions.
 Lead with what changed (decisions that replaced earlier ones) and anything overdue.
-Mention deadlines with the weekday ("due Thu Nov 5"). Address the person as "you".
+For dates, copy the "due" field exactly ("due Thu Nov 5"); never compute weekdays yourself.
+Address the person as "you".
 highlights: one bullet per decision or change that affects them. heads_up: overdue items,
 unresolved conflicts, tasks that may be obsolete because a decision changed (say why), and
 tasks missing a deadline. Keep every bullet under 25 words."""
@@ -49,6 +50,8 @@ def gather(person: str, today: date | None = None) -> dict:
         "m.title AS meeting_title "
         "FROM action_items a JOIN meetings m ON m.id = a.meeting_id "
         "WHERE lower(a.owner) = lower(?) ORDER BY a.deadline IS NULL, a.deadline", (person,))
+    for t in tasks:
+        t["due"] = _day(t["deadline"]) if t["deadline"] else "no deadline"  # models get weekdays wrong
     open_items = [t for t in tasks if t["status"] == "open"]
     overdue = [t for t in open_items if t["deadline"] and t["deadline"] < today.isoformat()]
     due_this_week = [t for t in open_items
