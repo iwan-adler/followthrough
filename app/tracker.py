@@ -58,13 +58,15 @@ def _github(method: str, path: str, json: dict) -> dict:
     return resp.json()
 
 
-def post(item_id: int, evidence: str = "") -> dict:
-    """Create the ticket for one confirmed action item and record where it went."""
+def post(item_id: int, evidence: str = "", local_only: bool = False) -> dict:
+    """Create the ticket for one confirmed action item and record where it went.
+    local_only keeps it in the mock tracker even when GitHub is configured (seeded demo data)."""
     item = db.row("SELECT * FROM action_items WHERE id = ?", (item_id,))
     meeting = db.row("SELECT * FROM meetings WHERE id = ?", (item["meeting_id"],))
     title, body = item["title"], issue_body(item, meeting, evidence)
+    where = "mock" if local_only else mode()
     try:
-        if mode() == "github":
+        if where == "github":
             payload: dict = {"title": title, "body": body, "labels": ["followthrough"]}
             if login := _assignee(item["owner"]):
                 payload["assignees"] = [login]
@@ -77,10 +79,10 @@ def post(item_id: int, evidence: str = "") -> dict:
             )
             url, ref = f"mock://FT-{tid}", f"FT-{tid}"
         db.execute("UPDATE action_items SET tracker = ?, tracker_url = ?, tracker_ref = ?, tracker_error = NULL "
-                   "WHERE id = ?", (mode(), url, ref, item_id))
+                   "WHERE id = ?", (where, url, ref, item_id))
     except Exception as e:  # keep the task; the UI offers a retry
         db.execute("UPDATE action_items SET tracker = ?, tracker_error = ? WHERE id = ?",
-                   (mode(), str(e)[:300], item_id))
+                   (where, str(e)[:300], item_id))
     return db.row("SELECT * FROM action_items WHERE id = ?", (item_id,))
 
 

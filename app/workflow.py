@@ -105,7 +105,7 @@ def preview(transcript: str, meeting_date: date) -> dict:
     }
 
 
-def confirm_meeting(meeting_id: int, close_task_ids: list[int] | tuple = ()) -> dict:
+def confirm_meeting(meeting_id: int, close_task_ids: list[int] | tuple = (), local_only: bool = False) -> dict:
     """The confirmation gate: nothing reaches memory or the tracker before this.
 
     close_task_ids: open tasks built on a decision this meeting supersedes, which the user
@@ -131,7 +131,7 @@ def confirm_meeting(meeting_id: int, close_task_ids: list[int] | tuple = ()) -> 
         conn.execute("UPDATE meetings SET status = 'confirmed', confirmed_at = datetime('now') WHERE id = ?",
                      (meeting_id,))
     # Committed first, then posted: a tracker outage never loses confirmed work (retry from Tasks).
-    tasks = [tracker.post(item_id, a.evidence) for item_id, a in zip(action_ids, ex.action_items)]
+    tasks = [tracker.post(item_id, a.evidence, local_only=local_only) for item_id, a in zip(action_ids, ex.action_items)]
     closed = [
         tracker.close_obsolete(tid, f"Superseded in {m['title']}: “{c['new_decision']}” replaces “{c['old_text']}”.")
         for tid, (_, c) in ((tid, closable[tid]) for tid in dict.fromkeys(close_task_ids))
@@ -156,7 +156,8 @@ def load_demo(confirm_all: bool = False) -> dict:
         if confirm:
             for c in view["conflicts"]:
                 memory.resolve_conflict(c["id"], "supersede")
-            confirm_meeting(view["id"])
+            # Seeded meetings never post to a real tracker: rehearsing must not spam the repo.
+            confirm_meeting(view["id"], local_only=True)
         loaded.append({"id": view["id"], "title": item["title"],
                        "status": "confirmed" if confirm else "staged", "conflicts": len(view["conflicts"])})
     return {"meetings": loaded}

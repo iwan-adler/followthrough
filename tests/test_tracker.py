@@ -89,3 +89,12 @@ def test_task_reassignment(client):
     out = client.patch(f"/api/tasks/{task['id']}", json={"owner": "Priya", "deadline": "2026-12-01"}).json()
     assert (out["owner"], out["deadline"]) == ("Priya", "2026-12-01")
     assert [t["id"] for t in client.get("/api/tasks?owner=priya").json()] == [task["id"]]
+
+
+def test_demo_seed_never_posts_to_github(client, fake_github):
+    """Rehearsing (Load demo) must not create issues; only a presenter's confirm does."""
+    client.post("/api/demo/load")
+    client.post("/api/demo/load")
+    assert fake_github == []
+    kickoff_tasks = client.get("/api/tasks").json()
+    assert kickoff_tasks and all(t["tracker"] == "mock" for t in kickoff_tasks)
