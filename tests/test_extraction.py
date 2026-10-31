@@ -112,7 +112,7 @@ def test_extract_api_stages_meeting(client):
     body = r.json()
     assert body["speakers"] == ["Priya", "Raj", "Sam"]
     assert len(body["extraction"]["decisions"]) == 3
-    m = client.get(f"/api/meetings/{body['meeting_id']}").json()
+    m = client.get(f"/api/meetings/{body['id']}").json()
     assert m["status"] == "staged"
 
 

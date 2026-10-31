@@ -48,7 +48,9 @@ CREATE TABLE IF NOT EXISTS conflicts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     meeting_id INTEGER NOT NULL REFERENCES meetings(id),
     new_decision TEXT NOT NULL,
-    new_decision_id INTEGER REFERENCES decisions(id),
+    new_decision_index INTEGER NOT NULL,     -- position in the staged meeting's decisions
+    new_speaker TEXT,
+    new_decision_id INTEGER REFERENCES decisions(id),  -- set on confirm
     old_decision_id INTEGER NOT NULL REFERENCES decisions(id),
     kind TEXT NOT NULL,                      -- contradiction | supersession
     explanation TEXT NOT NULL,
@@ -92,6 +94,19 @@ def connect() -> Iterator[sqlite3.Connection]:
 def init_db() -> None:
     with connect() as conn:
         conn.executescript(SCHEMA)
+        # Columns added after the first schema version, for databases created earlier.
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(conflicts)")}
+        if "new_decision_index" not in cols:
+            conn.execute("ALTER TABLE conflicts ADD COLUMN new_decision_index INTEGER NOT NULL DEFAULT 0")
+        if "new_speaker" not in cols:
+            conn.execute("ALTER TABLE conflicts ADD COLUMN new_speaker TEXT")
+
+
+def reset() -> None:
+    with connect() as conn:
+        for table in ("notifications", "mock_tracker", "conflicts", "action_items", "decisions", "meetings"):
+            conn.execute(f"DELETE FROM {table}")
+        conn.execute("DELETE FROM sqlite_sequence")
 
 
 def rows(sql: str, params: tuple = ()) -> list[dict[str, Any]]:

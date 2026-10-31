@@ -1,0 +1,5 @@
+[
+  {"file": "01_product_kickoff.txt", "title": "Product kickoff", "days_ago": 12},
+  {"file": "02_design_sync.txt", "title": "Design & infra sync", "days_ago": 5},
+  {"file": "03_sprint_planning.txt", "title": "Sprint planning", "days_ago": 1}
+]

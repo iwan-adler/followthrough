@@ -1,0 +1,9 @@
+Priya: Okay, um, let's kick this off. So, the big one, the launch. I think we said, uh, November 20th... no wait, November 23rd. Yeah. We decided we're launching on November 23rd, that gives QA the full week.
+Raj: Works for me. On the database, I know there was a whole debate, but, like, we're going with Postgres. Mongo was tempting but we need the relational stuff for billing.
+Diego: Agreed, Postgres. I'll set up the Postgres schema and migrations by Friday.
+Priya: Great. Pricing. Um, Mei, you had numbers?
+Mei: Yeah so, uh, the pricing is $29 a month, no wait, sorry, $25 a month per seat for the Pro plan, with a free tier for up to three users.
+Priya: Love it. Mei, can you draft the pricing page copy by next Wednesday?
+Mei: Yep.
+Sam: Oh and I'll have the onboarding mockups in Figma by end of week. Um, the the new ones, with the checklist.
+Priya: Perfect. Someone should look into SOC 2 at some point, but that's, you know, later.

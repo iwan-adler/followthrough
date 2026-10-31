@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from . import llm
 from .dates import DATE_PHRASE_RE, parse_iso, resolve_date
 from .speech import (
-    UNKNOWN, Utterance, clean_speech, format_for_llm, guess_topic, parse_transcript, speakers,
+    UNKNOWN, Utterance, clean_speech, format_for_llm, guess_topic, keywords, parse_transcript, speakers,
 )
 
 
@@ -57,11 +57,15 @@ digressions, self-corrections and half-finished sentences. Rules:
 8. Write decision text and task titles so they make sense without the transcript."""
 
 
-def build_prompt(utterances: list[Utterance], meeting_date: date, title: str) -> str:
+def build_prompt(utterances: list[Utterance], meeting_date: date, title: str,
+                 known_topics: list[str] | None = None) -> str:
+    topics = (f"Decision topics already in memory (reuse these names when the subject matches): "
+              f"{', '.join(known_topics)}\n" if known_topics else "")
     return (
         f"Meeting: {title}\n"
         f"Meeting date: {meeting_date.isoformat()} ({meeting_date.strftime('%A')})\n"
-        f"Speakers: {', '.join(speakers(utterances))}\n\n"
+        f"Speakers: {', '.join(speakers(utterances))}\n"
+        f"{topics}\n"
         f"Transcript:\n{format_for_llm(utterances)}"
     )
 
@@ -72,7 +76,8 @@ _DECISION_CUES = re.compile(
     r"\b(we decided|decided|decision is|let'?s go with|we'?re going with|going with|we'?ll go with|"
     r"agreed|we agree|final answer|locking in|lock in|settled on|it'?s official|we'?re launching|"
     r"we'?ll launch|launch is|launching on|we'?ll use|we'?re using|we will use|pricing is|price is|"
-    r"we'?re moving to|moving to|switching to|we'?ll switch|instead of|is going to be|will be priced)\b",
+    r"we'?re moving to|moving to|switching to|we'?ll switch|instead of|is going to be|will be priced|"
+    r"stays at|staying at|sticking with|no change)\b",
     re.I,
 )
 _STRONG_CUES = re.compile(r"\b(decided|final|agreed|locking in|lock in|official|settled)\b", re.I)
@@ -87,23 +92,24 @@ _ACTION_CUES = re.compile(
 )
 _NOT_NAMES = {"We", "I", "It", "That", "This", "There", "They", "You", "Someone", "Somebody",
               "Everyone", "Nobody", "Which", "What", "And", "But", "So", "Then", "Also", "Okay", "Ok"}
-_LEAD_INS = re.compile(r"^(?:and|but|so|also|then|okay|ok|alright|right|yeah|well)[, ]+", re.I)
+_LEAD_INS = re.compile(r"^(?:(?:oh|and|but|so|also|then|okay|ok|alright|right|yeah|well)[, ]+)+", re.I)
 
 
 def _owner_for(sentence: str, speaker: str, people: set[str]) -> str | None:
-    if m := _ASKED_OWNER.search(sentence):
-        if m[1] not in _NOT_NAMES:
-            return m[1]
-    if m := _NAMED_OWNER.search(sentence):
-        if m[1] not in _NOT_NAMES and (m[1] in people or not people):
-            return m[1]
-    if _SELF_OWNER.search(sentence):
-        return None if speaker == UNKNOWN else speaker
-    return None
+    """Earliest ownership cue wins: in "I'll write it so Raj can review", the owner is the speaker."""
+    found: list[tuple[int, str | None]] = []
+    if (m := _ASKED_OWNER.search(sentence)) and m[1] not in _NOT_NAMES:
+        found.append((m.start(), m[1]))
+    if (m := _NAMED_OWNER.search(sentence)) and m[1] not in _NOT_NAMES and (m[1] in people or not people):
+        found.append((m.start(), m[1]))
+    if m := _SELF_OWNER.search(sentence):
+        found.append((m.start(), None if speaker == UNKNOWN else speaker))
+    return min(found, key=lambda f: f[0])[1] if found else None
 
 
 def _task_title(sentence: str, owner: str | None, date_phrase: str | None) -> str:
-    t = sentence
+    # Drop trailing asides: "Set up monitoring, we keep forgetting" -> "Set up monitoring".
+    t = re.split(r",\s*(?:so|but|because|since|which|we|that's)\b", sentence)[0]
     if date_phrase:
         t = t.replace(date_phrase, " ")
     t = re.sub(
@@ -119,7 +125,10 @@ def _task_title(sentence: str, owner: str | None, date_phrase: str | None) -> st
 
 
 def _decision_text(sentence: str) -> str:
-    t = _LEAD_INS.sub("", sentence.strip(" ,"))
+    # "Marketing wants runway, so, launch is Dec 7" -> keep the clause carrying the decision.
+    parts = re.split(r",\s*(?:so|but|and)\b,?\s*", sentence)
+    t = next((p for p in reversed(parts) if _DECISION_CUES.search(p)), sentence)
+    t = _LEAD_INS.sub("", t.strip(" ,"))
     t = re.sub(r"^(?:so |okay |alright )*(?:we decided|decided|the decision is)( that)?\s*", "", t, flags=re.I)
     return (t[:1].upper() + t[1:]).rstrip(" ,.") if t else sentence
 
@@ -147,8 +156,11 @@ def mock_extract(utterances: list[Utterance], meeting_date: date) -> Extraction:
             if _ACTION_CUES.search(sentence) and (owner or is_self or "?" not in sentence):
                 m = DATE_PHRASE_RE.search(sentence)
                 phrase = m[0] if m else None
+                title = _task_title(sentence, owner, phrase)
+                if len(keywords(title)) < 2:  # "Yeah, I can do that"
+                    continue
                 actions.append(ExtractedAction(
-                    title=_task_title(sentence, owner, phrase), owner=owner,
+                    title=title, owner=owner,
                     deadline_text=phrase, speaker=u.speaker,
                     confidence=round((0.8 if owner else 0.6) - (0.15 if hedged else 0), 2),
                     evidence=sentence,
@@ -198,13 +210,14 @@ def postprocess(ex: Extraction, utterances: list[Utterance], meeting_date: date)
     return ex
 
 
-def extract(transcript: str, meeting_date: date, title: str = "Untitled meeting") -> tuple[list[Utterance], Extraction]:
+def extract(transcript: str, meeting_date: date, title: str = "Untitled meeting",
+            known_topics: list[str] | None = None) -> tuple[list[Utterance], Extraction]:
     utterances = parse_transcript(transcript)
     if not utterances:
         return [], Extraction(summary="Empty transcript.")
     ex = llm.generate_json(
         system=SYSTEM_PROMPT,
-        prompt=build_prompt(utterances, meeting_date, title),
+        prompt=build_prompt(utterances, meeting_date, title, known_topics),
         schema=Extraction,
         mock=lambda: mock_extract(utterances, meeting_date),
     )

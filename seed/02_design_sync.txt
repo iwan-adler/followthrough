@@ -1,0 +1,9 @@
+Priya: Alright, um, quick sync. Sam, how are the mockups looking?
+Sam: Good, they're in Figma. I'll walk Mei through them tomorrow.
+Raj: So, uh, infra update. Diego and I spent the weekend on it and honestly Firebase just gets us there faster, so we're using Firebase for the backend.
+Raj: Diego, can you move the auth flow over to Firebase by Thursday?
+Diego: Yeah, I can do that.
+Priya: Cool. Marketing wants more runway, so, um, launch is December 7th.
+Priya: Mei, can you get the launch announcement draft to me by next Monday?
+Mei: Got it. Oh and, uh, pricing stays at $25 a seat, no change there.
+Priya: Great, thanks everyone.

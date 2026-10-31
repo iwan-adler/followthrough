@@ -1,0 +1,7 @@
+Priya: Okay, sprint planning, let's, um, go around. Raj?
+Raj: So I'll finish the Firebase data model by Monday. And, uh, I'll pair with Diego on the security rules.
+Diego: I'm going to write the security rules by Wednesday... actually no, Tuesday, so Raj can review them.
+Priya: Sam, can you finalize the onboarding checklist design by tomorrow?
+Sam: Yes, tomorrow works. I'll also do the empty states by end of next week.
+Mei: I'll send the beta invite email by Monday. And, um, I'll schedule the launch webinar, I mean, the launch livestream, for the first week of December.
+Priya: And I'll update the investor deck by Thursday. Oh, um, someone needs to set up error monitoring, we keep forgetting.

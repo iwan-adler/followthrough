@@ -122,6 +122,14 @@ def _apply_correction(before: str, after: str) -> str:
         # Long restatement replaces the abandoned sentence fragment entirely.
         cut = max(before.rfind(". "), before.rfind("? "), before.rfind("! "))
         return (before[: cut + 2] if cut >= 0 else "") + clause + rest
+    # "the launch webinar, I mean, the launch livestream": realign on the repeated first word.
+    first = clause.split()[0].lower() if clause else ""
+    before = re.sub(r"\s+", " ", before).rstrip()
+    window = " ".join(before.split()[-6:])
+    idx = f" {window.lower()} ".rfind(f" {first} ") if first else -1
+    if idx >= 0:
+        start = len(before) - len(window) + idx
+        return before[:start] + clause + rest
     # No recognisable slot: assume the correction replaces the last word.
     words = before.rstrip(" ,.").rsplit(" ", 1)
     return (words[0] + " " if len(words) > 1 else "") + clause + rest

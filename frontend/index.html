@@ -32,6 +32,17 @@
   <main>
     <!-- New Meeting -->
     <section id="tab-new" class="panel active">
+      <div class="card demo-bar">
+        <div>
+          <strong>Demo mode</strong>
+          <span class="muted small">Loads a confirmed kickoff meeting, then stages a later meeting that quietly contradicts it.</span>
+        </div>
+        <div class="actions">
+          <button id="demo-sample" class="btn secondary">Insert sample transcript</button>
+          <button id="demo-load" class="btn primary">Load demo meetings</button>
+        </div>
+      </div>
+
       <div class="card">
         <div class="row">
           <label class="field grow">
@@ -64,13 +75,19 @@
         </div>
         <div id="m-error" class="alert error" hidden></div>
       </div>
-
-      <div id="m-result" hidden></div>
     </section>
 
-    <section id="tab-review" class="panel"><div class="empty">Review &amp; confirm arrives in step 3.</div></section>
+    <section id="tab-review" class="panel">
+      <div id="review-picker" hidden>
+        <label class="field">
+          <span>Staged meetings awaiting confirmation</span>
+          <select id="review-select"></select>
+        </label>
+      </div>
+      <div id="review-body"><div class="empty">Nothing to review. Extract a meeting or load the demo.</div></div>
+    </section>
     <section id="tab-tasks" class="panel"><div class="empty">Tracker tasks arrive in step 4.</div></section>
-    <section id="tab-memory" class="panel"><div class="empty">Decision memory arrives in step 2.</div></section>
+    <section id="tab-memory" class="panel"><div id="memory-body"></div></section>
     <section id="tab-digest" class="panel"><div class="empty">Weekly digest arrives in step 6.</div></section>
     <section id="tab-reminders" class="panel"><div class="empty">Reminders arrive in step 5.</div></section>
   </main>
