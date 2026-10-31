@@ -86,7 +86,18 @@
       </div>
       <div id="review-body"><div class="empty">Nothing to review. Extract a meeting or load the demo.</div></div>
     </section>
-    <section id="tab-tasks" class="panel"><div class="empty">Tracker tasks arrive in step 4.</div></section>
+    <section id="tab-tasks" class="panel">
+      <div id="tasks-banner"></div>
+      <div class="toolbar">
+        <span id="tracker-badge" class="badge"></span>
+        <span class="spacer"></span>
+        <select id="tasks-owner" aria-label="Filter by owner"><option value="">Everyone</option></select>
+        <select id="tasks-status" aria-label="Filter by status">
+          <option value="open">Open</option><option value="done">Done</option><option value="">All</option>
+        </select>
+      </div>
+      <div id="tasks-body"></div>
+    </section>
     <section id="tab-memory" class="panel"><div id="memory-body"></div></section>
     <section id="tab-digest" class="panel"><div class="empty">Weekly digest arrives in step 6.</div></section>
     <section id="tab-reminders" class="panel"><div class="empty">Reminders arrive in step 5.</div></section>

@@ -56,7 +56,7 @@ async function withButton(btn, busyText, fn) {
 }
 
 // --- tabs -------------------------------------------------------------------------
-const TAB_LOADERS = { review: () => loadReview(), memory: () => loadMemory() };
+const TAB_LOADERS = { review: () => loadReview(), tasks: () => loadTasks(), memory: () => loadMemory() };
 
 function showTab(name) {
   document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === name));
@@ -462,7 +462,7 @@ $("#review-body").addEventListener("click", async (e) => {
       loadReview();
     } else if (t.closest("#confirm-btn")) {
       const btn = t.closest("#confirm-btn");
-      await withButton(btn, "Confirming…", async () => {
+      lastConfirm = await withButton(btn, "Confirming…", async () => {
         if (dirty || savePromise) await saveDraft();
         return api(`/api/meetings/${draft.id}/confirm`, { method: "POST" });
       });
@@ -476,7 +476,118 @@ $("#review-body").addEventListener("click", async (e) => {
   }
 });
 
-const TAB_AFTER_CONFIRM = "memory";
+const TAB_AFTER_CONFIRM = "tasks";
+
+// --- Tasks --------------------------------------------------------------------------
+let lastConfirm = null;   // result of the most recent confirm, shown once as a banner
+
+function dueState(t) {
+  if (t.status === "done") return "done";
+  if (!t.deadline) return "none";
+  const today = new Date(new Date().toDateString());
+  const due = new Date(t.deadline + "T00:00:00");
+  const days = Math.round((due - today) / 86400000);
+  if (days < 0) return "overdue";
+  if (days <= 1) return "soon";
+  return "upcoming";
+}
+
+const DUE_GROUPS = [
+  ["overdue", "Overdue"], ["soon", "Due within a day"], ["upcoming", "Upcoming"],
+  ["none", "No deadline"], ["done", "Done"],
+];
+
+function trackerLink(t) {
+  if (t.tracker_error) {
+    return `<span class="badge flag" title="${esc(t.tracker_error)}">not posted</span>
+            <button class="btn small ghost" data-retry="${t.id}">Retry</button>`;
+  }
+  if (!t.tracker_url) return "";
+  if (t.tracker === "github") {
+    return `<a class="badge topic" href="${esc(t.tracker_url)}" target="_blank" rel="noopener">GitHub ${esc(t.tracker_ref)} ↗</a>`;
+  }
+  return `<span class="badge topic" title="Local mock tracker ticket">${esc(t.tracker_ref)}</span>`;
+}
+
+function renderTask(t) {
+  const state = dueState(t);
+  return `
+    <div class="item task ${state}">
+      <label class="check"><input type="checkbox" data-done="${t.id}" ${t.status === "done" ? "checked" : ""}
+        aria-label="Mark done"></label>
+      <div class="task-main">
+        <div class="title">${esc(t.title)}</div>
+        <div class="meta">
+          ${t.owner ? `${avatar(t.owner)} ${esc(t.owner)}` : `<span class="badge flag">needs owner</span>`}
+          ${t.deadline ? `<span class="badge due-${state}">📅 ${fmtDate(t.deadline)}</span>` : `<span class="badge flag">needs deadline</span>`}
+          <span class="muted small">from ${esc(t.meeting_title)}</span>
+          ${trackerLink(t)}
+        </div>
+      </div>
+    </div>`;
+}
+
+async function loadTasks() {
+  const body = $("#tasks-body");
+  if (!body.children.length) loading(body);
+  try {
+    const [info, all] = await Promise.all([api("/api/tracker"), api("/api/tasks")]);
+    $("#tracker-badge").className = `badge ${info.mode === "github" ? "live" : "mock"}`;
+    $("#tracker-badge").textContent = info.mode === "github" ? `Tracker: GitHub · ${info.repo}` : "Tracker: local mock (no GITHUB_TOKEN)";
+
+    const ownerSel = $("#tasks-owner");
+    const owners = [...new Set(all.map((t) => t.owner).filter(Boolean))].sort();
+    const current = ownerSel.value;
+    ownerSel.innerHTML = `<option value="">Everyone</option>` + owners.map((o) => `<option ${o === current ? "selected" : ""}>${esc(o)}</option>`).join("");
+
+    if (lastConfirm) {
+      const n = lastConfirm.tasks.length;
+      const posted = lastConfirm.tasks.filter((t) => t.tracker_url).length;
+      const where = lastConfirm.tracker.mode === "github" ? `GitHub (${lastConfirm.tracker.repo})` : "the local mock tracker";
+      $("#tasks-banner").innerHTML = `<div class="alert ${posted === n ? "ok" : "error"}">✓ Confirmed. ${posted} of ${n} task${n === 1 ? "" : "s"} posted to ${esc(where)}.${posted < n ? " Use Retry on the ones that failed." : ""}</div>`;
+      lastConfirm = null;
+    } else {
+      $("#tasks-banner").innerHTML = "";
+    }
+
+    const status = $("#tasks-status").value;
+    const tasks = all.filter((t) => (!ownerSel.value || t.owner === ownerSel.value) && (!status || t.status === status));
+    if (!tasks.length) {
+      body.innerHTML = `<div class="empty">${all.length ? "No tasks match these filters." : "No tasks yet. Confirm a meeting to create them."}</div>`;
+      return;
+    }
+    body.innerHTML = DUE_GROUPS.map(([key, label]) => {
+      const group = tasks.filter((t) => dueState(t) === key);
+      return group.length ? `<h3 class="section-title">${label} <span class="muted small">${group.length}</span></h3>${group.map(renderTask).join("")}` : "";
+    }).join("");
+  } catch (err) {
+    body.innerHTML = `<div class="alert error">${esc(err.message)}</div>`;
+  }
+}
+$("#tasks-owner").addEventListener("change", loadTasks);
+$("#tasks-status").addEventListener("change", loadTasks);
+
+$("#tasks-body").addEventListener("click", async (e) => {
+  const retry = e.target.closest("[data-retry]");
+  if (!retry) return;
+  try {
+    await withButton(retry, "Posting…", () => api(`/api/tasks/${retry.dataset.retry}/retry`, { method: "POST" }));
+  } catch (err) {
+    alert(err.message);
+  }
+  loadTasks();
+});
+
+$("#tasks-body").addEventListener("change", async (e) => {
+  const box = e.target.closest("[data-done]");
+  if (!box) return;
+  try {
+    await api(`/api/tasks/${box.dataset.done}`, { method: "PATCH", body: { status: box.checked ? "done" : "open" } });
+  } catch (err) {
+    alert(err.message);
+  }
+  loadTasks();
+});
 
 // --- Memory -------------------------------------------------------------------------
 async function loadMemory() {

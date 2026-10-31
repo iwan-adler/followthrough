@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import db, llm, memory, workflow
+from . import db, llm, memory, tracker, workflow
 from .extraction import Extraction
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
@@ -22,6 +22,15 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Followthrough", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def revalidate_frontend(request, call_next):
+    """Make browsers revalidate the static UI so frontend edits show up on reload."""
+    response = await call_next(request)
+    if not request.url.path.startswith("/api"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 class ExtractRequest(BaseModel):
@@ -115,6 +124,71 @@ def resolve_conflict(conflict_id: int, req: ResolveRequest) -> dict:
 @app.get("/api/memory")
 def decision_memory() -> list[dict]:
     return memory.timeline()
+
+
+class TaskUpdate(BaseModel):
+    status: str | None = None
+    owner: str | None = None
+    deadline: date | None = None
+
+
+_TASK_SELECT = """SELECT a.*, m.title AS meeting_title, m.meeting_date
+                  FROM action_items a JOIN meetings m ON m.id = a.meeting_id"""
+
+
+def _task_or_404(task_id: int) -> dict:
+    task = db.row(_TASK_SELECT + " WHERE a.id = ?", (task_id,))
+    if not task:
+        raise HTTPException(404, "Task not found.")
+    return task
+
+
+@app.get("/api/tracker")
+def tracker_info() -> dict:
+    return tracker.info()
+
+
+@app.get("/api/tracker/mock")
+def mock_tracker() -> list[dict]:
+    return tracker.mock_tickets()
+
+
+@app.get("/api/tasks")
+def list_tasks(owner: str | None = None, status: str | None = None) -> list[dict]:
+    sql, params = _TASK_SELECT + " WHERE 1 = 1", []
+    if owner:
+        sql += " AND lower(a.owner) = lower(?)"
+        params.append(owner)
+    if status:
+        sql += " AND a.status = ?"
+        params.append(status)
+    return db.rows(sql + " ORDER BY a.status = 'done', a.deadline IS NULL, a.deadline, a.id", tuple(params))
+
+
+@app.patch("/api/tasks/{task_id}")
+def update_task(task_id: int, req: TaskUpdate) -> dict:
+    task = _task_or_404(task_id)
+    if req.status is not None:
+        if req.status not in ("open", "done"):
+            raise HTTPException(400, "status must be open or done")
+        db.execute("UPDATE action_items SET status = ?, completed_at = CASE WHEN ? = 'done' "
+                   "THEN datetime('now') END WHERE id = ?", (req.status, req.status, task_id))
+        tracker.set_closed(task, req.status == "done")
+    if "owner" in req.model_fields_set:
+        db.execute("UPDATE action_items SET owner = ? WHERE id = ?", ((req.owner or "").strip() or None, task_id))
+    if "deadline" in req.model_fields_set:
+        db.execute("UPDATE action_items SET deadline = ? WHERE id = ?",
+                   (req.deadline.isoformat() if req.deadline else None, task_id))
+    return _task_or_404(task_id)
+
+
+@app.post("/api/tasks/{task_id}/retry")
+def retry_task(task_id: int) -> dict:
+    task = _task_or_404(task_id)
+    if task["tracker_url"]:
+        raise HTTPException(409, "Already posted to the tracker.")
+    tracker.post(task_id)
+    return _task_or_404(task_id)
 
 
 @app.get("/api/demo/transcripts")

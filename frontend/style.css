@@ -229,3 +229,17 @@ textarea.inline { resize: vertical; width: 100%; line-height: 1.45; font-size: 1
 .icon-btn:hover { background: var(--danger-soft); color: var(--danger); }
 .warn-text { color: var(--warn); font-size: 13px; }
 .error-text { color: var(--danger) !important; }
+
+/* --- tasks ------------------------------------------------------------------------------ */
+.toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.toolbar select { width: auto; padding: 7px 10px; font-size: 14px; }
+.item.task { display: flex; gap: 12px; align-items: flex-start; }
+.item.task.overdue { box-shadow: inset 3px 0 0 var(--danger); }
+.item.task.soon { box-shadow: inset 3px 0 0 var(--warn); }
+.item.task.done .title { text-decoration: line-through; color: var(--muted); }
+.task-main { flex: 1; min-width: 0; }
+.check input { width: 18px; height: 18px; margin-top: 3px; accent-color: var(--accent); cursor: pointer; }
+.badge.due-overdue { background: var(--danger-soft); color: var(--danger); }
+.badge.due-soon { background: var(--warn-soft); color: var(--warn); }
+a.badge { text-decoration: none; }
+a.badge:hover { filter: brightness(1.1); }

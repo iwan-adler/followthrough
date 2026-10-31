@@ -15,6 +15,7 @@ class Settings:
     llm_max_retries: int
     github_token: str
     github_repo: str
+    github_user_map: str
     db_path: str
     reminder_interval_minutes: int
 
@@ -28,6 +29,7 @@ def settings() -> Settings:
         llm_max_retries=int(env("LLM_MAX_RETRIES", "3")),
         github_token=env("GITHUB_TOKEN", "").strip(),
         github_repo=env("GITHUB_REPO", "").strip(),
+        github_user_map=env("GITHUB_USER_MAP", ""),
         db_path=env("DB_PATH", "followthrough.db"),
         reminder_interval_minutes=int(env("REMINDER_INTERVAL_MINUTES", "15")),
     )

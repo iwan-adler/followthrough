@@ -5,7 +5,7 @@ import json
 from datetime import date, timedelta
 from pathlib import Path
 
-from . import db, llm, memory
+from . import db, llm, memory, tracker
 from .extraction import Extraction, extract, postprocess
 from .speech import parse_transcript
 
@@ -68,7 +68,7 @@ def discard_draft(meeting_id: int) -> None:
 
 
 def confirm_meeting(meeting_id: int) -> dict:
-    """The confirmation gate: nothing reaches memory (or, later, the tracker) before this."""
+    """The confirmation gate: nothing reaches memory or the tracker before this."""
     m = meeting_view(meeting_id)
     if m["status"] == "confirmed":
         raise GateError("This meeting is already confirmed.")
@@ -86,7 +86,10 @@ def confirm_meeting(meeting_id: int) -> dict:
         ]
         conn.execute("UPDATE meetings SET status = 'confirmed', confirmed_at = datetime('now') WHERE id = ?",
                      (meeting_id,))
-    return {"meeting_id": meeting_id, "decision_ids": decision_ids, "action_item_ids": action_ids}
+    # Committed first, then posted: a tracker outage never loses confirmed work (retry from Tasks).
+    tasks = [tracker.post(item_id, a.evidence) for item_id, a in zip(action_ids, ex.action_items)]
+    return {"meeting_id": meeting_id, "decision_ids": decision_ids, "action_item_ids": action_ids,
+            "tracker": tracker.info(), "tasks": tasks}
 
 
 def load_demo(confirm_all: bool = False) -> dict:
