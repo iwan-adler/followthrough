@@ -81,9 +81,11 @@ def format_for_llm(utterances: list[Utterance]) -> str:
 
 # --- self-corrections and filler -------------------------------------------------
 
+_MARKER = (r"(?:no,? wait|wait,? no|no no|sorry|scratch that|i mean|actually,? no|correction|"
+           r"or rather|make that|let me rephrase)")
+# Chains like "no wait, sorry," count as one correction.
 _CORRECTION_RE = re.compile(
-    r"(?:\s*(?:\.{2,}|…|—|–|,|-))?\s*\b(?:no,? wait|wait,? no|no no|sorry|scratch that|"
-    r"i mean|actually,? no|correction|or rather|make that|let me rephrase)\b[,.:]?\s*",
+    rf"(?:\s*(?:\.{{2,}}|…|—|–|,|-))?\s*\b{_MARKER}(?:[,.:]?\s*{_MARKER})*\b[,.:]?\s*",
     re.IGNORECASE,
 )
 _FILLER_RE = re.compile(
@@ -105,23 +107,27 @@ _CLASSES = [
 ]
 
 
-def _apply_correction(before: str, after: str) -> str:
+def _apply_correction(before: str, after: str) -> tuple[str, str, str]:
+    """Returns (corrected text, abandoned words, replacement)."""
     clause_m = re.match(r"[^.;!?,]*", after)
     clause = clause_m[0].strip()
     rest = after[len(clause_m[0]) :]
     if not before.strip():
-        return after
+        return after, "", ""
     for cls in _CLASSES:
         new = cls.match(clause)  # correction starts with a replaceable slot: date, price, name...
         olds = list(cls.finditer(before))
         if new and olds:
             old = olds[-1]
-            tail = before[old.end() :] if len(clause.split()) <= 3 else ""
-            return before[: old.start()] + clause + tail + rest
+            keep_tail = len(clause.split()) <= 3
+            tail = before[old.end() :] if keep_tail else ""
+            abandoned = before[old.start() : old.end() if keep_tail else len(before)]
+            return before[: old.start()] + clause + tail + rest, abandoned, clause
     if len(clause.split()) >= 4:
         # Long restatement replaces the abandoned sentence fragment entirely.
         cut = max(before.rfind(". "), before.rfind("? "), before.rfind("! "))
-        return (before[: cut + 2] if cut >= 0 else "") + clause + rest
+        head = before[: cut + 2] if cut >= 0 else ""
+        return head + clause + rest, before[len(head) :], clause
     # "the launch webinar, I mean, the launch livestream": realign on the repeated first word.
     first = clause.split()[0].lower() if clause else ""
     before = re.sub(r"\s+", " ", before).rstrip()
@@ -129,20 +135,40 @@ def _apply_correction(before: str, after: str) -> str:
     idx = f" {window.lower()} ".rfind(f" {first} ") if first else -1
     if idx >= 0:
         start = len(before) - len(window) + idx
-        return before[:start] + clause + rest
+        return before[:start] + clause + rest, before[start:], clause
     # No recognisable slot: assume the correction replaces the last word.
     words = before.rstrip(" ,.").rsplit(" ", 1)
-    return (words[0] + " " if len(words) > 1 else "") + clause + rest
+    return (words[0] + " " if len(words) > 1 else "") + clause + rest, words[-1], clause
 
 
-def resolve_self_corrections(text: str) -> str:
-    """'launch Friday... no wait, Monday' -> 'launch Monday'."""
+def resolve_self_corrections(text: str, found: list[tuple[str, str]] | None = None) -> str:
+    """'launch Friday... no wait, Monday' -> 'launch Monday'. Appends (abandoned, replacement)
+    pairs to `found` when given."""
     for _ in range(10):
         m = _CORRECTION_RE.search(text)
         if not m:
             break
-        text = _apply_correction(text[: m.start()], text[m.end() :])
+        text, abandoned, replacement = _apply_correction(text[: m.start()], text[m.end() :])
+        if found is not None and abandoned.strip(" ,.") and replacement:
+            found.append((abandoned.strip(" ,."), replacement))
     return text
+
+
+def voice_report(utterances: list[Utterance]) -> dict:
+    """What the speech cleanup did, for showing off how messy dictation was handled."""
+    corrections, fillers = [], 0
+    for u in utterances:
+        pairs: list[tuple[str, str]] = []
+        resolve_self_corrections(u.text, pairs)
+        corrections += [{"speaker": u.speaker, "said": a, "meant": b} for a, b in pairs]
+        fillers += len(_FILLER_RE.findall(u.text))
+    return {
+        "utterances": len(utterances),
+        "speakers": speakers(utterances),
+        "unattributed": sum(1 for u in utterances if u.speaker == UNKNOWN),
+        "corrections": corrections,
+        "filler_words": fillers,
+    }
 
 
 def clean_speech(text: str) -> str:

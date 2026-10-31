@@ -389,6 +389,7 @@ function renderReview() {
         <span class="muted small">${fmtDate(draft.meeting_date)} · draft #${draft.id} · click any text to edit</span>
         <p class="muted">${esc(draft.summary)}</p>
         <div class="speakers">${draft.speakers.map((s) => `<span class="chip">${avatar(s)}${esc(s)}</span>`).join("")}</div>
+        ${renderVoicePanel(draft.voice, draft.transcript)}
       </div>
       <div id="conflicts-box"></div>
       ${speakerOptions()}
@@ -470,10 +471,10 @@ $("#review-body").addEventListener("click", async (e) => {
       loadReview();
     } else if (t.closest("#confirm-btn")) {
       const btn = t.closest("#confirm-btn");
-      lastConfirm = await withButton(btn, "Confirming…", async () => {
-        if (dirty || savePromise) await saveDraft();
-        return api(`/api/meetings/${draft.id}/confirm`, { method: "POST" });
-      });
+      if (dirty || savePromise) await withButton(btn, "Saving…", saveDraft);
+      if (!(await askToConfirm())) return;
+      lastConfirm = await withButton(btn, "Posting…", () =>
+        api(`/api/meetings/${draft.id}/confirm`, { method: "POST" }));
       reviewMeetingId = null;
       draft = null;
       refreshBadges();
@@ -485,6 +486,57 @@ $("#review-body").addEventListener("click", async (e) => {
 });
 
 const TAB_AFTER_CONFIRM = "tasks";
+
+// --- Voice cleanup panel & final confirmation dialog -----------------------------------
+function renderVoicePanel(v, transcript) {
+  if (!v) return "";
+  const stats = [
+    `${v.utterances} utterance${v.utterances === 1 ? "" : "s"}`,
+    `${v.speakers.length} speaker${v.speakers.length === 1 ? "" : "s"}`,
+    `${v.filler_words} filler word${v.filler_words === 1 ? "" : "s"} dropped`,
+    `${v.corrections.length} self-correction${v.corrections.length === 1 ? "" : "s"} resolved`,
+  ];
+  if (v.unattributed) stats.push(`${v.unattributed} unattributed (Unknown)`);
+  return `
+    <div class="voice-panel">
+      <div class="voice-stats"><span class="badge live">🎙 Speech cleanup</span> <span class="muted small">${stats.join(" · ")}</span></div>
+      ${v.corrections.length ? `<ul class="corrections">${v.corrections.map((c) => `
+        <li>${avatar(c.speaker)} <del>${esc(c.said)}</del> <span class="muted">→</span> <ins>${esc(c.meant)}</ins></li>`).join("")}</ul>` : ""}
+      <details><summary class="small muted">Show original transcript</summary><pre class="transcript">${esc(transcript)}</pre></details>
+    </div>`;
+}
+
+async function askToConfirm() {
+  const info = await api("/api/tracker").catch(() => ({ mode: "mock" }));
+  const ex = draft.extraction;
+  const items = ex.action_items.filter((a) => a.title.trim());
+  const decisions = ex.decisions.filter((d) => d.text.trim());
+  const where = info.mode === "github" ? `GitHub Issues in <strong>${esc(info.repo)}</strong>` : "the <strong>local mock tracker</strong>";
+  const effects = draft.conflicts.map((c) => ({
+    supersede: `“${esc(c.old_text)}” will be marked superseded by “${esc(c.new_decision)}”`,
+    keep: `“${esc(c.old_text)}” stays; “${esc(c.new_decision)}” is set aside`,
+    dismiss: `“${esc(c.old_text)}” and “${esc(c.new_decision)}” both stay active`,
+  }[c.resolution]));
+  $("#confirm-summary").innerHTML = `
+    <p>This will create <strong>${items.length} task${items.length === 1 ? "" : "s"}</strong> in ${where}
+       and save <strong>${decisions.length} decision${decisions.length === 1 ? "" : "s"}</strong> to team memory.</p>
+    ${items.length ? `<ul class="confirm-list">${items.map((a) => `
+      <li><span>${esc(a.title)}</span>
+        <span class="muted small">${a.owner ? esc(a.owner) : "<span class='warn-text'>no owner</span>"} ·
+          ${a.deadline ? fmtDate(a.deadline) : "<span class='warn-text'>no deadline</span>"}</span></li>`).join("")}</ul>` : ""}
+    ${effects.length ? `<p class="small"><strong>Memory changes</strong></p><ul class="bullets small">${effects.map((e) => `<li>${e}</li>`).join("")}</ul>` : ""}
+    <p class="muted small">Nothing has been posted yet. You can go back and edit.</p>`;
+  $("#confirm-ok").textContent = items.length ? `Post ${items.length} task${items.length === 1 ? "" : "s"} & save` : "Save to memory";
+  const dialog = $("#confirm-dialog");
+  dialog.returnValue = "";
+  dialog.showModal();
+  return new Promise((resolve) => dialog.addEventListener("close", () => resolve(dialog.returnValue === "ok"), { once: true }));
+}
+
+// Ctrl/Cmd+Enter extracts from the dictation box.
+$("#m-transcript").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) $("#m-extract").click();
+});
 
 // --- Tasks --------------------------------------------------------------------------
 let lastConfirm = null;   // result of the most recent confirm, shown once as a banner

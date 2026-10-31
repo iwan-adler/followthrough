@@ -7,7 +7,7 @@ from pathlib import Path
 
 from . import db, llm, memory, tracker
 from .extraction import Extraction, extract, postprocess
-from .speech import parse_transcript
+from .speech import parse_transcript, voice_report
 
 SEED_DIR = Path(__file__).resolve().parent.parent / "seed"
 
@@ -21,6 +21,7 @@ def meeting_view(meeting_id: int) -> dict:
     if not m:
         raise LookupError("Meeting not found.")
     m["conflicts"] = memory.list_conflicts(meeting_id)
+    m["voice"] = voice_report(parse_transcript(m["transcript"]))
     m["open_conflicts"] = sum(1 for c in m["conflicts"] if not c["resolution"])
     return m
 

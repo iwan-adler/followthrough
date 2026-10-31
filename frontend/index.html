@@ -126,6 +126,18 @@
     </section>
   </main>
 
+  <dialog id="confirm-dialog" aria-labelledby="confirm-title">
+    <form method="dialog">
+      <h2 id="confirm-title">Ready to post?</h2>
+      <div id="confirm-summary"></div>
+      <div class="actions">
+        <span class="spacer"></span>
+        <button value="cancel" class="btn ghost">Back to review</button>
+        <button value="ok" id="confirm-ok" class="btn primary">Confirm</button>
+      </div>
+    </form>
+  </dialog>
+
   <script src="app.js"></script>
 </body>
 </html>
