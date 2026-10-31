@@ -183,11 +183,13 @@ def _match_person(name: str | None, people: list[str]) -> str | None:
     for p in people:
         if p.lower() == name.lower() or p.split()[0].lower() == name.split()[0].lower():
             return p
-    return name
+    return name.title() if name.islower() else name
 
 
-def postprocess(ex: Extraction, utterances: list[Utterance], meeting_date: date) -> Extraction:
-    people = [s for s in speakers(utterances) if s != UNKNOWN]
+def postprocess(ex: Extraction, utterances: list[Utterance], meeting_date: date,
+                known_people: list[str] | None = None) -> Extraction:
+    # People from earlier meetings count too: owners are often not in the room.
+    people = list(dict.fromkeys([s for s in speakers(utterances) if s != UNKNOWN] + (known_people or [])))
     seen: set[str] = set()
     actions = []
     for a in ex.action_items:
@@ -211,7 +213,8 @@ def postprocess(ex: Extraction, utterances: list[Utterance], meeting_date: date)
 
 
 def extract(transcript: str, meeting_date: date, title: str = "Untitled meeting",
-            known_topics: list[str] | None = None) -> tuple[list[Utterance], Extraction]:
+            known_topics: list[str] | None = None,
+            known_people: list[str] | None = None) -> tuple[list[Utterance], Extraction]:
     utterances = parse_transcript(transcript)
     if not utterances:
         return [], Extraction(summary="Empty transcript.")
@@ -221,4 +224,4 @@ def extract(transcript: str, meeting_date: date, title: str = "Untitled meeting"
         schema=Extraction,
         mock=lambda: mock_extract(utterances, meeting_date),
     )
-    return utterances, postprocess(ex, utterances, meeting_date)
+    return utterances, postprocess(ex, utterances, meeting_date, known_people)

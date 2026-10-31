@@ -5,7 +5,7 @@ import json
 from datetime import date, timedelta
 from pathlib import Path
 
-from . import db, llm, memory, tracker
+from . import db, digest, llm, memory, tracker
 from .extraction import Extraction, extract, postprocess
 from .speech import parse_transcript, voice_report
 
@@ -27,7 +27,8 @@ def meeting_view(meeting_id: int) -> dict:
 
 
 def stage_meeting(transcript: str, meeting_date: date, title: str) -> dict:
-    utterances, ex = extract(transcript, meeting_date, title, known_topics=memory.known_topics())
+    utterances, ex = extract(transcript, meeting_date, title,
+                             known_topics=memory.known_topics(), known_people=digest.people())
     extraction_source = llm.provider_info()["last_source"]
     speakers = list(dict.fromkeys(u.speaker for u in utterances))
     meeting_id = db.create_meeting(title, meeting_date.isoformat(), transcript, speakers,
@@ -54,7 +55,7 @@ def update_draft(meeting_id: int, extraction: Extraction, title: str | None = No
     meeting_date = date.fromisoformat(m["meeting_date"])
     extraction.decisions = [d for d in extraction.decisions if d.text.strip()]
     extraction.action_items = [a for a in extraction.action_items if a.title.strip()]
-    ex = postprocess(extraction, parse_transcript(m["transcript"]), meeting_date)
+    ex = postprocess(extraction, parse_transcript(m["transcript"]), meeting_date, digest.people())
     db.execute("UPDATE meetings SET extraction = ?, title = ? WHERE id = ?",
                (json.dumps(ex.model_dump()), (title or m["title"]).strip(), meeting_id))
     memory.detect_conflicts(meeting_id, meeting_date, ex.decisions)
