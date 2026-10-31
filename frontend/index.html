@@ -5,156 +5,189 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Followthrough</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <span class="logo" aria-hidden="true">↻</span>
-      <div>
-        <h1>Followthrough</h1>
-        <p class="tagline">From what was said to what gets done</p>
+  <!-- Icon sprite (Lucide-style 24px line icons). Use: <svg class="i"><use href="#i-name"/></svg> -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+      <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></symbol>
+      <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+      <symbol id="i-tasks" viewBox="0 0 24 24"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></symbol>
+      <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
+      <symbol id="i-mail" viewBox="0 0 24 24"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></symbol>
+      <symbol id="i-external" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+      <symbol id="i-message" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+      <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></symbol>
+      <symbol id="i-columns" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></symbol>
+      <symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M6 3l14 9-14 9V3z"/></symbol>
+      <symbol id="i-reset" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+      <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    </defs>
+  </svg>
+
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+          <rect width="32" height="32" rx="7"/>
+          <path d="M9 16.5l4.5 4.5L23 11.5"/>
+        </svg>
+        <span>Followthrough</span>
       </div>
+
+      <nav class="nav" role="tablist" aria-label="Sections">
+        <button class="tab active" data-tab="new" role="tab"><svg class="i"><use href="#i-plus"/></svg><span>New meeting</span><kbd>1</kbd></button>
+        <button class="tab" data-tab="review" role="tab"><svg class="i"><use href="#i-inbox"/></svg><span>Review</span><span class="count" hidden></span><kbd>2</kbd></button>
+        <button class="tab" data-tab="tasks" role="tab"><svg class="i"><use href="#i-tasks"/></svg><span>Tasks</span><kbd>3</kbd></button>
+        <button class="tab" data-tab="memory" role="tab"><svg class="i"><use href="#i-history"/></svg><span>Decision memory</span><kbd>4</kbd></button>
+        <button class="tab" data-tab="digest" role="tab"><svg class="i"><use href="#i-mail"/></svg><span>Digest</span><kbd>5</kbd></button>
+        <button class="tab" data-tab="reminders" role="tab"><svg class="i"><use href="#i-bell"/></svg><span>Reminders</span><span class="count" hidden></span><kbd>6</kbd></button>
+      </nav>
+
+      <button class="palette-btn" id="palette-open" type="button">
+        <svg class="i"><use href="#i-search"/></svg><span>Search or run…</span><kbd>Ctrl K</kbd>
+      </button>
+
+      <div class="sidebar-foot">
+        <dl id="stats" class="stats" aria-label="At a glance"></dl>
+        <span id="llm-badge" class="llm" title="LLM provider">checking model…</span>
+      </div>
+    </aside>
+
+    <div class="main-col">
+      <header class="page-head">
+        <div>
+          <h1 id="page-title">New meeting</h1>
+          <p id="page-sub" class="muted"></p>
+        </div>
+        <div id="page-actions" class="page-actions"></div>
+      </header>
+
+      <main>
+        <!-- New Meeting -->
+        <section id="tab-new" class="panel active">
+          <div id="hero" class="intro" hidden>
+            <p class="intro-lede">Meetings decide things. Then the work drifts, and meeting two quietly undoes meeting one.</p>
+            <ol class="intro-steps">
+              <li><span class="step-n">1</span><div><strong>Talk</strong><p>Dictate a recap with Wispr Flow. Filler and self-corrections are handled.</p></div></li>
+              <li><span class="step-n">2</span><div><strong>Catch</strong><p>Every new decision is checked against what the team already decided.</p></div></li>
+              <li><span class="step-n">3</span><div><strong>Confirm</strong><p>Nothing is posted until you review it. Then issues, reminders and digests follow.</p></div></li>
+            </ol>
+          </div>
+
+          <div class="card compose">
+            <div class="compose-head">
+              <input id="m-title" class="title-field" type="text" placeholder="Untitled meeting" aria-label="Meeting title">
+              <label class="date-field"><svg class="i"><use href="#i-calendar"/></svg><input id="m-date" type="date" aria-label="Meeting date"></label>
+            </div>
+
+            <div class="dictate-grid">
+              <div class="dictate">
+                <textarea id="m-transcript" rows="14" aria-label="Transcript or recap"
+                  placeholder="Dictate your meeting recap here…&#10;&#10;Priya: um so we're launching Friday… no wait, Monday the 17th.&#10;Raj: I'll draft the migration plan by next Friday."></textarea>
+                <div class="dictate-foot">
+                  <span class="hint"><svg class="i"><use href="#i-mic"/></svg>Hold your Wispr Flow key and talk. Prefix lines with <code>Name:</code> to attribute speakers.</span>
+                </div>
+              </div>
+              <aside id="live-panel" class="live-panel" aria-live="polite"></aside>
+            </div>
+
+            <div class="compose-actions">
+              <label class="btn ghost file-btn">
+                <svg class="i"><use href="#i-upload"/></svg>Upload transcript
+                <input id="m-file" type="file" accept=".txt,.md,.vtt,.srt,text/plain" hidden>
+              </label>
+              <span id="m-file-name" class="muted small mono"></span>
+              <span class="spacer"></span>
+              <span class="muted small kbd-hint"><kbd>Ctrl</kbd> <kbd>Enter</kbd></span>
+              <button id="m-extract" class="btn primary">Extract decisions &amp; tasks</button>
+            </div>
+            <div id="m-error" class="alert error" hidden></div>
+          </div>
+
+          <div class="demo-strip">
+            <span class="muted small"><strong>Demo data</strong>: a confirmed kickoff meeting, then a later meeting that quietly contradicts it.</span>
+            <span class="spacer"></span>
+            <button id="demo-reset" class="btn ghost small" title="Delete all meetings, decisions and tasks"><svg class="i"><use href="#i-reset"/></svg>Reset</button>
+            <button id="demo-sample" class="btn ghost small"><svg class="i"><use href="#i-file"/></svg>Sample transcript</button>
+            <button id="demo-load" class="btn secondary small"><svg class="i"><use href="#i-play"/></svg>Load demo meetings</button>
+          </div>
+        </section>
+
+        <section id="tab-review" class="panel">
+          <div id="review-picker" class="picker" hidden>
+            <span class="muted small">Waiting for confirmation</span>
+            <div id="review-select" class="segmented" role="tablist"></div>
+          </div>
+          <div id="review-body"><div class="empty">Nothing to review. Extract a meeting or load the demo.</div></div>
+        </section>
+
+        <section id="tab-tasks" class="panel">
+          <div id="tasks-banner"></div>
+          <div class="toolbar">
+            <span id="tracker-badge" class="tracker-chip"></span>
+            <span class="spacer"></span>
+            <select id="tasks-owner" aria-label="Filter by owner"><option value="">Everyone</option></select>
+            <select id="tasks-status" aria-label="Filter by status">
+              <option value="open">Open</option><option value="done">Closed</option><option value="">All</option>
+            </select>
+            <div class="segmented" role="tablist" aria-label="View">
+              <button class="seg active" data-view="list" title="By due date"><svg class="i"><use href="#i-list"/></svg></button>
+              <button class="seg" data-view="board" title="By person"><svg class="i"><use href="#i-columns"/></svg></button>
+            </div>
+          </div>
+          <div id="tasks-body"></div>
+        </section>
+
+        <section id="tab-memory" class="panel">
+          <form class="ask-bar" id="ask-form" autocomplete="off">
+            <svg class="i"><use href="#i-message"/></svg>
+            <input id="ask-input" aria-label="Ask your team memory"
+              placeholder="Ask your team memory, e.g. “When did we switch to Firebase, and who decided?”">
+            <button class="btn primary small" id="ask-btn">Ask</button>
+          </form>
+          <div id="ask-result"></div>
+          <div id="memory-body"></div>
+        </section>
+
+        <section id="tab-digest" class="panel">
+          <div class="toolbar">
+            <div id="digest-people" class="people-picker"></div>
+          </div>
+          <div id="digest-body"><div class="empty">Pick a person to generate their digest.</div></div>
+        </section>
+
+        <section id="tab-reminders" class="panel">
+          <div class="toolbar">
+            <span id="reminder-status" class="muted small"><svg class="i"><use href="#i-clock"/></svg>Checking scheduler…</span>
+            <span class="spacer"></span>
+            <select id="notif-person" aria-label="Filter by person"><option value="">Everyone</option></select>
+            <button id="notif-read-all" class="btn ghost small">Mark all read</button>
+            <button id="run-reminders" class="btn primary small"><svg class="i"><use href="#i-bell"/></svg>Run reminders now</button>
+          </div>
+          <div id="reminder-banner"></div>
+          <div id="notif-body"></div>
+        </section>
+      </main>
     </div>
-    <div class="header-right">
-      <div id="stats" class="stats" aria-label="At a glance"></div>
-      <span id="llm-badge" class="badge muted" title="LLM provider">checking LLM…</span>
-    </div>
-  </header>
-
-  <nav class="tabs" role="tablist">
-    <button class="tab active" data-tab="new" role="tab">New Meeting</button>
-    <button class="tab" data-tab="review" role="tab">Review</button>
-    <button class="tab" data-tab="tasks" role="tab">Tasks</button>
-    <button class="tab" data-tab="memory" role="tab">Memory</button>
-    <button class="tab" data-tab="digest" role="tab">Digest</button>
-    <button class="tab" data-tab="reminders" role="tab">Reminders</button>
-  </nav>
-
-  <main>
-    <!-- New Meeting -->
-    <section id="tab-new" class="panel active">
-      <div id="hero" class="hero" hidden>
-        <h2>Meetings decide things. Then nobody follows through.</h2>
-        <p>Followthrough listens to your meeting recap, turns it into owned, dated work, and catches the moment
-          a new meeting quietly contradicts an old decision, before the wrong work gets done.</p>
-        <ol class="hero-steps">
-          <li><span>🎙</span><strong>Talk</strong>Dictate with Wispr Flow. Filler and self-corrections are handled.</li>
-          <li><span>⚠</span><strong>Catch</strong>New decisions are checked against everything the team decided before.</li>
-          <li><span>✅</span><strong>Confirm</strong>Nothing is posted until you review it. Then issues, reminders and digests follow.</li>
-        </ol>
-      </div>
-      <div class="card demo-bar">
-        <div>
-          <strong>Demo mode</strong>
-          <span class="muted small">Loads a confirmed kickoff meeting, then stages a later meeting that quietly contradicts it.</span>
-        </div>
-        <div class="actions">
-          <button id="demo-reset" class="btn ghost" title="Delete all meetings, decisions and tasks">Reset</button>
-          <button id="demo-sample" class="btn secondary">Insert sample transcript</button>
-          <button id="demo-load" class="btn primary">Load demo meetings</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="row">
-          <label class="field grow">
-            <span>Meeting title</span>
-            <input id="m-title" type="text" placeholder="e.g. Weekly product sync">
-          </label>
-          <label class="field">
-            <span>Meeting date</span>
-            <input id="m-date" type="date">
-          </label>
-        </div>
-
-        <div class="dictate-grid">
-          <label class="field">
-            <span>Transcript or recap</span>
-            <textarea id="m-transcript" rows="14"
-              placeholder="Dictate your meeting recap here…&#10;&#10;Priya: um so we're launching Friday… no wait, Monday the 17th.&#10;Raj: I'll draft the migration plan by next Friday."></textarea>
-          </label>
-          <aside id="live-panel" class="live-panel" aria-live="polite">
-            <div class="live-head"><span class="live-dot"></span> Listening</div>
-            <p class="muted small">Start talking. Decisions, tasks, self-corrections and conflicts with past
-              meetings appear here as you speak.</p>
-          </aside>
-        </div>
-        <p class="hint">🎙️ Hold your <strong>Wispr Flow</strong> hotkey and just talk — filler words and
-          self-corrections are fine. Start lines with <code>Name:</code> to attribute speakers;
-          unlabeled text is attributed to <em>Unknown</em>.</p>
-
-        <div class="actions">
-          <label class="btn secondary file-btn">
-            📄 Upload transcript
-            <input id="m-file" type="file" accept=".txt,.md,.vtt,.srt,text/plain" hidden>
-          </label>
-          <span id="m-file-name" class="muted small"></span>
-          <span class="spacer"></span>
-          <button id="m-extract" class="btn primary">Extract decisions &amp; tasks</button>
-        </div>
-        <div id="m-error" class="alert error" hidden></div>
-      </div>
-    </section>
-
-    <section id="tab-review" class="panel">
-      <div id="review-picker" hidden>
-        <label class="field">
-          <span>Staged meetings awaiting confirmation</span>
-          <select id="review-select"></select>
-        </label>
-      </div>
-      <div id="review-body"><div class="empty">Nothing to review. Extract a meeting or load the demo.</div></div>
-    </section>
-    <section id="tab-tasks" class="panel">
-      <div id="tasks-banner"></div>
-      <div class="toolbar">
-        <span id="tracker-badge" class="badge"></span>
-        <span class="spacer"></span>
-        <select id="tasks-owner" aria-label="Filter by owner"><option value="">Everyone</option></select>
-        <select id="tasks-status" aria-label="Filter by status">
-          <option value="open">Open</option><option value="done">Done</option><option value="">All</option>
-        </select>
-      </div>
-      <div id="tasks-body"></div>
-    </section>
-    <section id="tab-memory" class="panel">
-      <form class="command-bar" id="ask-form" autocomplete="off">
-        <span class="cmd-icon" aria-hidden="true">🧠</span>
-        <input id="ask-input" aria-label="Ask your team memory"
-          placeholder="Ask your team memory… “When did we switch to Firebase, and who decided?”">
-        <button class="btn primary small" id="ask-btn">Ask</button>
-      </form>
-      <div id="ask-result"></div>
-      <div id="memory-body"></div>
-    </section>
-    <section id="tab-digest" class="panel">
-      <div class="card toolbar-card">
-        <div>
-          <strong>Weekly digest</strong>
-          <div class="muted small">One page per person: what changed, what's due in the next 7 days, what needs attention.</div>
-        </div>
-        <div id="digest-people" class="people-picker"></div>
-      </div>
-      <div id="digest-body"><div class="empty">Pick a person to generate their digest.</div></div>
-    </section>
-    <section id="tab-reminders" class="panel">
-      <div class="card toolbar-card">
-        <div>
-          <strong>Deadline reminders</strong>
-          <div id="reminder-status" class="muted small">Checking scheduler…</div>
-        </div>
-        <div class="actions">
-          <select id="notif-person" aria-label="Filter by person"><option value="">Everyone</option></select>
-          <button id="notif-read-all" class="btn ghost">Mark all read</button>
-          <button id="run-reminders" class="btn primary">⏰ Run reminders now</button>
-        </div>
-      </div>
-      <div id="reminder-banner"></div>
-      <div id="notif-body"></div>
-    </section>
-  </main>
+  </div>
 
   <dialog id="confirm-dialog" aria-labelledby="confirm-title">
     <form method="dialog">
@@ -166,6 +199,12 @@
         <button type="button" id="confirm-ok" class="btn primary">Confirm</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="palette" class="palette" aria-label="Command palette">
+    <div class="palette-input"><svg class="i"><use href="#i-search"/></svg><input id="palette-input" placeholder="Jump to a section, run an action, or ask memory…" autocomplete="off"></div>
+    <ul id="palette-list" role="listbox"></ul>
+    <div class="palette-foot muted"><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>Enter</kbd> run</span><span><kbd>Esc</kbd> close</span></div>
   </dialog>
 
   <script src="app.js"></script>

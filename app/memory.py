@@ -51,7 +51,14 @@ def active_decisions() -> list[dict]:
 
 
 def timeline() -> list[dict]:
-    return db.rows(_DECISION_SELECT + " ORDER BY m.meeting_date, d.id")
+    """All decisions in meeting order, each with the conflict (if any) that changed it."""
+    decisions = db.rows(_DECISION_SELECT + " ORDER BY m.meeting_date, d.id")
+    why = {c["old_decision_id"]: c for c in db.rows(
+        "SELECT old_decision_id, kind, explanation, resolution FROM conflicts WHERE resolution IS NOT NULL")}
+    for d in decisions:
+        c = why.get(d["id"])
+        d["change"] = {"kind": c["kind"], "explanation": c["explanation"], "resolution": c["resolution"]} if c else None
+    return decisions
 
 
 def known_topics() -> list[str]:

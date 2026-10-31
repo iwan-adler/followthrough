@@ -1,6 +1,7 @@
 """Followthrough API. The frontend in ../frontend is static and talks to /api only."""
 from __future__ import annotations
 
+import threading
 from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
@@ -20,6 +21,7 @@ FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 async def lifespan(_: FastAPI):
     db.init_db()
     reminders.start()
+    threading.Thread(target=llm.warm_up, daemon=True).start()
     yield
     reminders.stop()
 

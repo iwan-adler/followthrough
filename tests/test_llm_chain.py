@@ -85,3 +85,9 @@ def test_identical_prompt_is_served_from_cache(gemini, monkeypatch):
     db.reset()                                           # demo reset keeps the cache warm
     _go()
     assert calls == ["m-new"]
+
+
+def test_warm_up_picks_first_responsive_model(gemini):
+    gemini({"m-new": ApiError(503, "UNAVAILABLE"), "m-busy": ApiError(404, "NOT_FOUND"), "m-good": '{"ok": true}'})
+    assert llm.warm_up() == "m-good"
+    assert llm.chain()[0] == "m-good" and "m-busy" not in llm.chain()

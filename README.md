@@ -33,6 +33,12 @@ posted.
 | **Spoken edits** | "make Sam own the launch announcement and push it to Friday" edits the draft: the LLM plans operations, the app applies them deterministically (`app/commands.py`) |
 | **Ask your memory** | "When did we switch to Firebase, and who decided?" is answered from stored decisions only, with checked citations (`app/ask.py`) |
 | **"May be obsolete"** | Tasks that mention something a later decision replaced are flagged in Tasks and the digest |
+| **Decision map** | Memory shows topics × meetings: active decisions, superseded ones greyed, arrows to what replaced them. Click any decision for who made it, when, what replaced it and why it was flagged |
+| **Checkable extraction** | On Review, hovering a decision or task highlights the transcript line it came from, with the matching words marked |
+
+**Keyboard:** <kbd>Ctrl</kbd>+<kbd>K</kbd> opens a command palette (jump anywhere, run demo actions, open a person's digest, or ask memory).
+<kbd>1</kbd>–<kbd>6</kbd> switch sections. On Review, <kbd>S</kbd> / <kbd>K</kbd> / <kbd>D</kbd> resolve the next open conflict.
+<kbd>Ctrl</kbd>+<kbd>Enter</kbd> extracts from the dictation box. Light and dark themes follow the system, or toggle from the palette.
 
 ## Setup
 

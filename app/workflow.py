@@ -21,7 +21,9 @@ def meeting_view(meeting_id: int) -> dict:
     if not m:
         raise LookupError("Meeting not found.")
     m["conflicts"] = [{**c, "affected_tasks": memory.conflict_impact(c)} for c in memory.list_conflicts(meeting_id)]
-    m["voice"] = voice_report(parse_transcript(m["transcript"]))
+    utterances = parse_transcript(m["transcript"])
+    m["voice"] = voice_report(utterances)
+    m["utterances"] = [{"speaker": u.speaker, "text": u.text} for u in utterances]
     m["open_conflicts"] = sum(1 for c in m["conflicts"] if not c["resolution"])
     return m
 

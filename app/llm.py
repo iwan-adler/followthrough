@@ -134,6 +134,31 @@ def classify(e: Exception) -> str:
     return "busy"
 
 
+class _Ping(BaseModel):
+    ok: bool
+
+
+def warm_up() -> str | None:
+    """Find a responsive model before the first real request, so a demo's first click isn't
+    the one that waits on busy models. Runs in a background thread at startup."""
+    if not _live():
+        return None
+    s = settings()
+    for model in chain():
+        _current["model"] = model
+        try:
+            _Ping.model_validate(parse_json(_PROVIDERS[s.llm_provider]("Reply with JSON.", 'Return {"ok": true}')))
+            _sticky[s.llm_provider] = model
+            log.info("LLM warm-up: %s is responsive", model)
+            return model
+        except Exception as e:
+            if classify(e) == "gone":
+                _dead.add(model)
+            elif classify(e) == "auth":
+                return None
+    return None
+
+
 def _cache_get(key: str, schema: type[T]) -> T | None:
     try:
         hit = db.row("SELECT response FROM llm_cache WHERE key = ?", (key,))
