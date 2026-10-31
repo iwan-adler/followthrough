@@ -98,7 +98,9 @@ Free keys: Gemini at https://aistudio.google.com/apikey, Groq at https://console
 
 ## 3-minute demo script
 
-**Before you start:** server running, browser on New Meeting, Wispr Flow ready. With a key set,
+**Before you start:** server running, browser on New Meeting, Wispr Flow ready. Click **Preflight**
+(or <kbd>Ctrl</kbd>+<kbd>K</kbd> → "Run demo preflight check"): it confirms the model responds, the cache is
+warm, the tracker accepts issues and the demo data is loaded, with a fix for anything that isn't. With a key set,
 **rehearse once**: free-tier models are sometimes busy, and the response cache makes the second run
 instant with the same real-model output. New dictation still goes to the model live. Press **Reset**
 to start from the hero screen, then **Load demo meetings**, then go back to New Meeting.

@@ -308,6 +308,14 @@ def demo_transcripts() -> list[dict]:
     return workflow.demo_transcripts()
 
 
+@app.get("/api/preflight")
+def preflight() -> dict:
+    """'Ready to demo?' checks with fixes for anything that isn't."""
+    checks = workflow.preflight()
+    worst = "fail" if any(c["status"] == "fail" for c in checks) else "warn" if any(c["status"] == "warn" for c in checks) else "ok"
+    return {"status": worst, "checks": checks}
+
+
 @app.post("/api/demo/reset")
 def reset_demo() -> dict:
     """Wipe everything, for rehearsing the demo from a clean slate."""

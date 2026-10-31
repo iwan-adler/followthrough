@@ -113,5 +113,30 @@ def close_obsolete(item_id: int, reason: str) -> dict:
     return item
 
 
+def check() -> dict:
+    """Can we actually create issues? Used by the demo preflight."""
+    if mode() == "mock":
+        return {"status": "warn", "detail": "Local mock tracker (no GITHUB_TOKEN / GITHUB_REPO set)",
+                "fix": "Optional: set GITHUB_TOKEN and GITHUB_REPO in .env to post real GitHub issues."}
+    s = settings()
+    try:
+        resp = httpx.get(f"{GITHUB_API}/repos/{s.github_repo}", timeout=8, headers={
+            "Authorization": f"Bearer {s.github_token}", "Accept": "application/vnd.github+json"})
+    except Exception as e:
+        return {"status": "fail", "detail": f"GitHub unreachable: {str(e)[:120]}", "fix": "Check the network."}
+    if resp.status_code == 401:
+        return {"status": "fail", "detail": "GitHub rejected the token", "fix": "Create a new token and update GITHUB_TOKEN."}
+    if resp.status_code == 404:
+        return {"status": "fail", "detail": f"Repo {s.github_repo} not found, or the token can't see it",
+                "fix": "Check GITHUB_REPO (owner/name) and give the token access to that repo."}
+    repo = resp.json()
+    if not repo.get("has_issues", True):
+        return {"status": "fail", "detail": "Issues are disabled on the repo", "fix": "Enable Issues in the repo's settings."}
+    if repo.get("permissions") and not repo["permissions"].get("push"):
+        return {"status": "fail", "detail": "Token can read but not create issues",
+                "fix": "Give the token Issues: Read and write on this repo."}
+    return {"status": "ok", "detail": f"GitHub {s.github_repo}: issues can be created", "fix": ""}
+
+
 def mock_tickets() -> list[dict]:
     return db.rows("SELECT * FROM mock_tracker ORDER BY id DESC")

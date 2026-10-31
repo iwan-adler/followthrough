@@ -125,6 +125,7 @@
           <div class="demo-strip">
             <span class="muted small"><strong>Demo data</strong>: a confirmed kickoff meeting, then a later meeting that quietly contradicts it.</span>
             <span class="spacer"></span>
+            <button id="demo-preflight" class="btn ghost small" title="Check everything is ready before presenting"><svg class="i"><use href="#i-check"/></svg>Preflight</button>
             <button id="demo-reset" class="btn ghost small" title="Delete all meetings, decisions and tasks"><svg class="i"><use href="#i-reset"/></svg>Reset</button>
             <button id="demo-sample" class="btn ghost small"><svg class="i"><use href="#i-file"/></svg>Sample transcript</button>
             <button id="demo-load" class="btn secondary small"><svg class="i"><use href="#i-play"/></svg>Load demo meetings</button>
@@ -199,6 +200,16 @@
         <button type="button" id="confirm-ok" class="btn primary">Confirm</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="preflight-dialog" aria-labelledby="preflight-title">
+    <h2 id="preflight-title">Ready to demo?</h2>
+    <div id="preflight-body"></div>
+    <div class="actions" style="margin-top:16px">
+      <span class="spacer"></span>
+      <button type="button" id="preflight-rerun" class="btn ghost">Run again</button>
+      <button type="button" id="preflight-close" class="btn primary">Done</button>
+    </div>
   </dialog>
 
   <dialog id="palette" class="palette" aria-label="Command palette">

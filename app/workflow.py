@@ -162,6 +162,54 @@ def load_demo(confirm_all: bool = False) -> dict:
     return {"meetings": loaded}
 
 
+def preflight() -> list[dict]:
+    """'Ready to demo?' Each check: name, status (ok | warn | fail), detail, fix."""
+    from . import reminders  # local import: reminders imports nothing from here, but keep startup light
+
+    checks = []
+    info = llm.provider_info()
+    if not info["live"]:
+        checks.append({"name": "Language model", "status": "warn",
+                       "detail": "No LLM key: the offline rules engine will answer",
+                       "fix": "Set LLM_API_KEY in .env (free Gemini key) and restart the server."})
+    else:
+        model = llm.warm_up()
+        checks.append({"name": "Language model", **(
+            {"status": "ok", "detail": f"{info['provider']} · {model} responded", "fix": ""} if model else
+            {"status": "fail", "detail": "Every model in the chain is busy or unavailable right now",
+             "fix": "Wait a minute and re-run. The offline rules will keep the demo working meanwhile."})})
+        cached = db.row("SELECT count(*) AS n FROM llm_cache")["n"]
+        checks.append({"name": "Answer cache", **(
+            {"status": "ok", "detail": f"{cached} cached answers: rehearsed steps will be instant", "fix": ""} if cached >= 3 else
+            {"status": "warn", "detail": "Cache is cold: the first run of each step waits on the model",
+             "fix": "Rehearse once: Reset, Load demo meetings, click through the demo."})})
+
+    checks.append({"name": "Task tracker", **tracker.check()})
+
+    staged = db.rows("SELECT id FROM meetings WHERE status = 'staged'")
+    open_conflicts = len(memory.list_conflicts(open_only=True))
+    confirmed = db.row("SELECT count(*) AS n FROM meetings WHERE status = 'confirmed'")["n"]
+    if confirmed and staged and open_conflicts:
+        checks.append({"name": "Demo data", "status": "ok",
+                       "detail": f"Kickoff in memory, a meeting staged with {open_conflicts} open conflicts", "fix": ""})
+    else:
+        checks.append({"name": "Demo data", "status": "warn",
+                       "detail": "The demo starting point isn't loaded" if not confirmed else "No staged meeting with open conflicts",
+                       "fix": "Click Load demo meetings just before presenting."})
+
+    s = reminders.status()
+    checks.append({"name": "Reminder scheduler", **(
+        {"status": "ok", "detail": f"Running every {s['interval_minutes']} min", "fix": ""} if s["scheduler_running"] else
+        {"status": "warn", "detail": "Background scheduler is off", "fix": "Run reminders now still works for the demo."})})
+
+    seeds = json.loads((SEED_DIR / "meetings.json").read_text(encoding="utf-8"))
+    missing = [s["file"] for s in seeds if not (SEED_DIR / s["file"]).exists()]
+    checks.append({"name": "Seed meetings", **(
+        {"status": "ok", "detail": f"{len(seeds)} scripted meetings present", "fix": ""} if not missing else
+        {"status": "fail", "detail": f"Missing: {', '.join(missing)}", "fix": "Restore the seed/ folder from git."})})
+    return checks
+
+
 def demo_transcripts() -> list[dict]:
     manifest = json.loads((SEED_DIR / "meetings.json").read_text(encoding="utf-8"))
     return [{**item, "meeting_date": (date.today() - timedelta(days=item["days_ago"])).isoformat(),

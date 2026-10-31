@@ -1201,6 +1201,33 @@ $("#notif-body").addEventListener("click", async (e) => {
   refreshBadges();
 });
 
+// --- Demo preflight ------------------------------------------------------------------------------------
+const PREFLIGHT_ICON = { ok: ["check", "ok"], warn: ["alert", "warn"], fail: ["x", "danger"] };
+
+async function runPreflight() {
+  const dialog = $("#preflight-dialog");
+  if (!dialog.open) dialog.showModal();
+  $("#preflight-body").innerHTML = `<p class="muted small" style="margin-bottom:12px">Checking the model, cache, tracker and demo data…</p>
+    ${[80, 60, 70, 50].map((w) => `<div class="skeleton" style="width:${w}%;margin-top:12px"></div>`).join("")}`;
+  try {
+    const r = await api("/api/preflight");
+    const verdict = { ok: "Everything is ready.", warn: "Ready, with things worth a look.", fail: "Something needs fixing before you present." }[r.status];
+    $("#preflight-body").innerHTML = `
+      <div class="alert ${r.status === "ok" ? "ok" : r.status === "fail" ? "error" : ""}">${icon(PREFLIGHT_ICON[r.status][0])}<span>${verdict}</span></div>
+      <ul class="preflight">${r.checks.map((c) => `
+        <li><span class="tag ${PREFLIGHT_ICON[c.status][1]}">${icon(PREFLIGHT_ICON[c.status][0])}${c.status}</span>
+          <div><strong>${esc(c.name)}</strong><div class="small muted">${esc(c.detail)}</div>
+          ${c.fix ? `<div class="small">${esc(c.fix)}</div>` : ""}</div></li>`).join("")}</ul>`;
+  } catch (err) {
+    $("#preflight-body").innerHTML = `<div class="alert error">${icon("alert")}<span>${esc(err.message)}</span></div>`;
+  } finally {
+    loadHealth();
+  }
+}
+$("#demo-preflight").addEventListener("click", runPreflight);
+$("#preflight-rerun").addEventListener("click", runPreflight);
+$("#preflight-close").addEventListener("click", () => $("#preflight-dialog").close());
+
 // --- Command palette & keyboard ----------------------------------------------------------------------
 let paletteItems = [];
 let paletteSel = 0;
@@ -1212,6 +1239,7 @@ async function paletteCommands(query) {
   const actions = [
     { label: "Start dictating a meeting", icon: "mic", run: () => { showTab("new"); $("#m-transcript").focus(); } },
     { label: "Load demo meetings", icon: "play", run: () => loadDemo() },
+    { label: "Run demo preflight check", icon: "check", run: runPreflight },
     { label: "Insert sample transcript", icon: "file", run: () => { showTab("new"); insertSample(); } },
     { label: "Run reminders now", icon: "bell", run: () => { showTab("reminders"); runReminders(); } },
     { label: "Toggle light / dark theme", icon: "reset", run: toggleTheme },

@@ -565,3 +565,9 @@ dialog h2 { font-size: 17px; margin-bottom: 10px; }
 .toast .i { width: 14px; height: 14px; }
 .toast.error { background: var(--danger); color: #fff; }
 .toast.out { opacity: 0; transform: translateY(6px); }
+
+/* --- preflight ------------------------------------------------------------------------------------- */
+.preflight { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; }
+.preflight li { display: grid; grid-template-columns: 72px 1fr; gap: 12px; align-items: start; padding: 10px 0; border-top: 1px solid var(--border); }
+.preflight li:first-child { border-top: 0; }
+.preflight .tag { justify-content: center; text-transform: uppercase; font-size: 11px; letter-spacing: .04em; }

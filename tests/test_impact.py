@@ -61,3 +61,13 @@ def test_stats_and_reset(client):
     assert (s["meetings"], s["conflicts_caught"], s["superseded"], s["obsolete_closed"]) == (2, 2, 2, 1)
     assert client.post("/api/demo/reset").json() == {"ok": True}
     assert client.get("/api/stats").json()["meetings"] == 0
+
+
+def test_preflight_reports_demo_readiness(client):
+    r = client.get("/api/preflight").json()
+    names = {c["name"]: c for c in r["checks"]}
+    assert names["Demo data"]["status"] == "warn" and names["Task tracker"]["status"] == "warn"
+    assert names["Seed meetings"]["status"] == "ok" and r["status"] == "warn"
+    client.post("/api/demo/load")
+    names = {c["name"]: c for c in client.get("/api/preflight").json()["checks"]}
+    assert names["Demo data"]["status"] == "ok" and "2 open conflicts" in names["Demo data"]["detail"]
