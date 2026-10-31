@@ -5,6 +5,7 @@ Only called after the confirmation gate; nothing here runs on extraction or edit
 """
 from __future__ import annotations
 
+import json
 from datetime import date
 
 import httpx
@@ -63,6 +64,9 @@ def post(item_id: int, evidence: str = "", local_only: bool = False) -> dict:
     local_only keeps it in the mock tracker even when GitHub is configured (seeded demo data)."""
     item = db.row("SELECT * FROM action_items WHERE id = ?", (item_id,))
     meeting = db.row("SELECT * FROM meetings WHERE id = ?", (item["meeting_id"],))
+    if not evidence:  # a retry: recover the quote from the confirmed draft
+        drafted = json.loads(meeting["extraction"] or "{}").get("action_items", [])
+        evidence = next((a.get("evidence", "") for a in drafted if a.get("title") == item["title"]), "")
     title, body = item["title"], issue_body(item, meeting, evidence)
     where = "mock" if local_only else mode()
     try:

@@ -68,9 +68,11 @@ def test_github_failure_keeps_task_and_retry_posts(client, fake_github, monkeypa
     task = client.post(f"/api/meetings/{staged}/confirm").json()["tasks"][0]
     assert task["tracker_url"] is None and "Bad credentials" in task["tracker_error"]
 
-    monkeypatch.setattr(tracker, "_github", lambda m, p, json: {"html_url": "https://github.com/x/1", "number": 1})
+    posted_bodies = []
+    monkeypatch.setattr(tracker, "_github", lambda m, p, json: posted_bodies.append(json["body"]) or {"html_url": "https://github.com/x/1", "number": 1})
     retried = client.post(f"/api/tasks/{task['id']}/retry").json()
     assert retried["tracker_url"] == "https://github.com/x/1" and retried["tracker_error"] is None
+    assert "> " in posted_bodies[-1]  # the quote survives a retry
     assert client.post(f"/api/tasks/{task['id']}/retry").status_code == 409
 
 
