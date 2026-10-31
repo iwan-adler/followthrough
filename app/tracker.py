@@ -134,10 +134,14 @@ def check() -> dict:
     repo = resp.json()
     if not repo.get("has_issues", True):
         return {"status": "fail", "detail": "Issues are disabled on the repo", "fix": "Enable Issues in the repo's settings."}
-    if repo.get("permissions") and not repo["permissions"].get("push"):
-        return {"status": "fail", "detail": "Token can read but not create issues",
-                "fix": "Give the token Issues: Read and write on this repo."}
-    return {"status": "ok", "detail": f"GitHub {s.github_repo}: issues can be created", "fix": ""}
+    # The repo's "permissions" field reflects the account, not a fine-grained token. Probe the
+    # token itself: an empty issue is rejected as invalid (422) only if creating issues is allowed.
+    probe = httpx.post(f"{GITHUB_API}/repos/{s.github_repo}/issues", json={}, timeout=8, headers={
+        "Authorization": f"Bearer {s.github_token}", "Accept": "application/vnd.github+json"})
+    if probe.status_code in (401, 403, 404):
+        return {"status": "fail", "detail": "The token can see the repo but can't create issues",
+                "fix": "Edit the token: Repository access must include this repo, and Issues must be Read and write."}
+    return {"status": "ok", "detail": f"GitHub {s.github_repo}: token can create issues", "fix": ""}
 
 
 def mock_tickets() -> list[dict]:
