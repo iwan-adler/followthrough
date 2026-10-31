@@ -1,0 +1,6 @@
+Priya: Okay so um, let's get started. So for the launch, we decided we're launching on Friday... no wait, Monday the 17th, because QA needs the weekend.
+Raj: Yeah. And uh for the database we're going with Mongo, sorry, Postgres. Final answer.
+Priya: Pricing is $29 a month, no wait, $39 a month per seat.
+Raj: I'll draft the migration plan by next Friday.
+Priya: Sam, can you set up the staging environment by tomorrow?
+Sam: Yep, on it. Someone should also update the landing page copy.
