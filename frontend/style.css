@@ -253,3 +253,21 @@ a.badge:hover { filter: brightness(1.1); }
 .item.notif.read { opacity: .6; }
 .notif-icon { font-size: 18px; line-height: 1.4; }
 .alert:not(.ok):not(.error) { background: var(--surface-2); color: var(--muted); }
+
+/* --- digest ---------------------------------------------------------------------------- */
+.people-picker { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip.person { border: 1px solid var(--border); cursor: pointer; font: inherit; font-size: 13px; color: var(--text); }
+.chip.person:hover { border-color: var(--accent); }
+.chip.person.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.digest-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.digest-head .avatar { width: 40px; height: 40px; font-size: 18px; }
+.digest-head h2 { margin: 0; }
+.digest-summary { font-size: 16px; line-height: 1.6; margin: 6px 0 16px; }
+.bullets { margin: 0; padding-left: 18px; }
+.bullets li { margin-bottom: 8px; font-size: 14px; }
+.bullets.warn li::marker { color: var(--warn); }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+@media (max-width: 900px) { .grid-3 { grid-template-columns: 1fr; } }
+.digest-task { display: flex; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.digest-task:last-child { border-bottom: 0; }
+.digest-task .meta { display: flex; gap: 4px; flex-shrink: 0; align-items: flex-start; }

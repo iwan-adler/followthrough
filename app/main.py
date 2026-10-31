@@ -6,10 +6,11 @@ from datetime import date
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import db, llm, memory, reminders, tracker, workflow
+from . import db, digest, llm, memory, reminders, tracker, workflow
 from .extraction import Extraction
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
@@ -164,7 +165,9 @@ def list_tasks(owner: str | None = None, status: str | None = None) -> list[dict
     if status:
         sql += " AND a.status = ?"
         params.append(status)
-    return db.rows(sql + " ORDER BY a.status = 'done', a.deadline IS NULL, a.deadline, a.id", tuple(params))
+    tasks = db.rows(sql + " ORDER BY a.status = 'done', a.deadline IS NULL, a.deadline, a.id", tuple(params))
+    stale = memory.stale_task_reasons(tasks)
+    return [{**t, "possibly_obsolete": stale.get(t["id"])} for t in tasks]
 
 
 @app.patch("/api/tasks/{task_id}")
@@ -226,6 +229,21 @@ def mark_read(notification_id: int) -> dict:
 def mark_all_read() -> dict:
     db.execute("UPDATE notifications SET read = 1 WHERE read = 0")
     return {"ok": True}
+
+
+@app.get("/api/digest/people")
+def digest_people() -> list[str]:
+    return digest.people()
+
+
+@app.get("/api/digest/{person}")
+def person_digest(person: str) -> dict:
+    return digest.generate(person)
+
+
+@app.get("/api/digest/{person}/markdown", response_class=PlainTextResponse)
+def person_digest_markdown(person: str) -> str:
+    return digest.to_markdown(digest.generate(person))
 
 
 @app.get("/api/demo/transcripts")

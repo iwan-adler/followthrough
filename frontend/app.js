@@ -58,6 +58,7 @@ async function withButton(btn, busyText, fn) {
 // --- tabs -------------------------------------------------------------------------
 const TAB_LOADERS = {
   review: () => loadReview(), tasks: () => loadTasks(), memory: () => loadMemory(), reminders: () => loadReminders(),
+  digest: () => (digestPerson ? loadDigest(digestPerson) : loadDigestPeople()),
 };
 
 function showTab(name) {
@@ -528,6 +529,7 @@ function renderTask(t) {
           ${t.owner ? `${avatar(t.owner)} ${esc(t.owner)}` : `<span class="badge flag">needs owner</span>`}
           ${t.deadline ? `<span class="badge due-${state}">📅 ${fmtDate(t.deadline)}</span>` : `<span class="badge flag">needs deadline</span>`}
           <span class="muted small">from ${esc(t.meeting_title)}</span>
+          ${t.possibly_obsolete ? `<span class="badge kind-supersession" title="${esc(t.possibly_obsolete)}">⚠ may be obsolete</span>` : ""}
           ${trackerLink(t)}
         </div>
       </div>
@@ -683,6 +685,107 @@ $("#notif-body").addEventListener("click", async (e) => {
 
 // The scheduler creates reminders in the background; keep the tab badge current.
 setInterval(refreshBadges, 60000);
+
+// --- Digest -------------------------------------------------------------------------
+let digestPerson = null;
+
+async function loadDigestPeople() {
+  const box = $("#digest-people");
+  try {
+    const people = await api("/api/digest/people");
+    if (!people.length) {
+      box.innerHTML = `<span class="muted small">No people yet. Confirm a meeting first.</span>`;
+      return;
+    }
+    box.innerHTML = people.map((p) =>
+      `<button class="chip person ${p === digestPerson ? "active" : ""}" data-person="${esc(p)}">${avatar(p)}${esc(p)}</button>`).join("");
+  } catch (err) {
+    box.innerHTML = `<span class="error-text small">${esc(err.message)}</span>`;
+  }
+}
+
+function digestTaskList(items, empty) {
+  if (!items.length) return `<p class="muted small">${empty}</p>`;
+  return items.map((t) => `
+    <div class="digest-task">
+      <span>${esc(t.title)}</span>
+      <span class="meta">
+        ${t.deadline ? `<span class="badge due-${dueState({ ...t, status: "open" })}">${fmtDate(t.deadline)}</span>` : ""}
+        ${t.tracker_ref ? `<span class="badge topic">${esc(t.tracker_ref)}</span>` : ""}
+      </span>
+    </div>`).join("");
+}
+
+function renderDigest(d) {
+  const n = d.narrative;
+  const later = d.open_items.filter((t) => !d.due_this_week.some((x) => x.id === t.id) && !d.overdue.some((x) => x.id === t.id));
+  $("#digest-body").innerHTML = `
+    <div class="card digest">
+      <div class="digest-head">
+        ${avatar(d.person)}
+        <div class="grow">
+          <h2>${esc(n.subject)}</h2>
+          <span class="muted small">${fmtDate(d.week.start)} – ${fmtDate(d.week.end)} · written by ${esc(d.source)}</span>
+        </div>
+        <button class="btn small ghost" id="digest-copy">Copy as Markdown</button>
+      </div>
+      <p class="digest-summary">${esc(n.summary)}</p>
+      <div class="grid-2">
+        <div>
+          <h3>What changed</h3>
+          ${n.highlights.length ? `<ul class="bullets">${n.highlights.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : `<p class="muted small">No new decisions affecting you this week.</p>`}
+        </div>
+        <div>
+          <h3>Heads up</h3>
+          ${n.heads_up.length ? `<ul class="bullets warn">${n.heads_up.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : `<p class="muted small">Nothing needs attention. Nice.</p>`}
+        </div>
+      </div>
+    </div>
+    <div class="grid-3">
+      <div class="card"><h3>Overdue <span class="muted small">${d.overdue.length}</span></h3>${digestTaskList(d.overdue, "Nothing overdue.")}</div>
+      <div class="card"><h3>Due in the next 7 days <span class="muted small">${d.due_this_week.length}</span></h3>${digestTaskList(d.due_this_week, "Nothing due this week.")}</div>
+      <div class="card"><h3>Also open <span class="muted small">${later.length}</span></h3>${digestTaskList(later, "No other open items.")}</div>
+    </div>
+    ${d.unresolved_conflicts.length ? `
+      <div class="card">
+        <h3>Unresolved conflicts involving you</h3>
+        ${d.unresolved_conflicts.map((c) => `<p class="small"><span class="badge kind-${esc(c.kind)}">${esc(c.kind)}</span> ${esc(c.explanation)}</p>`).join("")}
+        <button class="btn small primary" data-goto="review">Resolve in Review</button>
+      </div>` : ""}`;
+}
+
+async function loadDigest(person) {
+  digestPerson = person;
+  loadDigestPeople();
+  const body = $("#digest-body");
+  loading(body, `Writing ${person}'s digest…`);
+  try {
+    renderDigest(await api(`/api/digest/${encodeURIComponent(person)}`));
+  } catch (err) {
+    body.innerHTML = `<div class="alert error">${esc(err.message)}</div>`;
+  } finally {
+    loadHealth();
+  }
+}
+
+$("#digest-people").addEventListener("click", (e) => {
+  const chip = e.target.closest("[data-person]");
+  if (chip) loadDigest(chip.dataset.person);
+});
+
+$("#digest-body").addEventListener("click", async (e) => {
+  if (e.target.closest("[data-goto]")) return showTab(e.target.closest("[data-goto]").dataset.goto);
+  const copy = e.target.closest("#digest-copy");
+  if (!copy) return;
+  try {
+    const md = await fetch(`${API_BASE}/api/digest/${encodeURIComponent(digestPerson)}/markdown`).then((r) => r.text());
+    await navigator.clipboard.writeText(md);
+    copy.textContent = "✓ Copied";
+  } catch {
+    copy.textContent = "Copy failed";
+  }
+  setTimeout(() => (copy.textContent = "Copy as Markdown"), 1800);
+});
 
 // --- Memory -------------------------------------------------------------------------
 async function loadMemory() {

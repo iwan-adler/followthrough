@@ -184,6 +184,27 @@ def mock_judge(pairs: list[tuple[int, ExtractedDecision, dict]]) -> Judgments:
     return Judgments(judgments=out)
 
 
+def stale_task_reasons(tasks: list[dict]) -> dict[int, str]:
+    """Open tasks that mention a value a later decision dropped, e.g. "Set up the Postgres
+    schema" after the team moved from Postgres to Firebase."""
+    replaced = db.rows(
+        "SELECT o.text AS old_text, n.text AS new_text, m.title AS meeting_title FROM decisions o "
+        "JOIN decisions n ON n.id = o.superseded_by JOIN meetings m ON m.id = n.meeting_id "
+        "WHERE o.status = 'superseded'")
+    reasons: dict[int, str] = {}
+    for r in replaced:
+        old_v, new_v = _values(r["old_text"]), _values(r["new_text"])
+        for cls, olds in old_v.items():
+            for norm, disp in olds.items():
+                if norm in new_v.get(cls, {}):
+                    continue
+                now = ", ".join(new_v.get(cls, {}).values()) or "something else"
+                for t in tasks:
+                    if t["status"] == "open" and t["id"] not in reasons and disp.lower() in t["title"].lower():
+                        reasons[t["id"]] = f"mentions {disp}, which {r['meeting_title']} replaced with {now}"
+    return reasons
+
+
 # --- detection & resolution --------------------------------------------------------------
 
 def detect_conflicts(meeting_id: int, meeting_date: date, decisions: list[ExtractedDecision]) -> list[dict]:
