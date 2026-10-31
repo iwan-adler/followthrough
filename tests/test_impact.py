@@ -51,3 +51,13 @@ def test_github_issue_gets_comment_and_closed(client, monkeypatch):
     closing = [c for c in calls if "/issues/7" in c[1]]
     assert closing[0][0] == "POST" and "Closed by Followthrough" in closing[0][2]["body"]
     assert closing[1][2] == {"state": "closed", "state_reason": "not_planned"}
+
+
+def test_stats_and_reset(client):
+    m = _staged_with_supersede(client)
+    task_id = next(c for c in m["conflicts"] if c["old_topic"] == "database")["affected_tasks"][0]["id"]
+    client.post(f"/api/meetings/{m['id']}/confirm", json={"close_task_ids": [task_id]})
+    s = client.get("/api/stats").json()
+    assert (s["meetings"], s["conflicts_caught"], s["superseded"], s["obsolete_closed"]) == (2, 2, 2, 1)
+    assert client.post("/api/demo/reset").json() == {"ok": True}
+    assert client.get("/api/stats").json()["meetings"] == 0

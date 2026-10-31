@@ -22,7 +22,17 @@ posted.
 | Tracker integration | One GitHub issue per action item, or a local mock tracker with the same UI (`app/tracker.py`) |
 | Reminders | APScheduler sweep for items overdue or due within 24h, plus **Run reminders now** (`app/reminders.py`) |
 | Weekly digest per person | Open items, due in the next 7 days, decisions that affect them, unresolved conflicts; LLM narrative with a template fallback (`app/digest.py`) |
-| Extra | **"May be obsolete"**: tasks that mention something a later decision replaced (a Postgres task after the move to Firebase) are flagged in Tasks and the digest |
+
+**Beyond the brief**
+
+| Feature | What it does |
+|---|---|
+| **Live dictation preview** | While you speak into Wispr Flow, an instant local pass shows decisions, tasks, corrections and filler cut, and warns **⚠ Contradicts Product kickoff** *before* you press Extract (`workflow.preview`) |
+| **Recap-style speech** | One flowing paragraph with inline `Name:` labels, or third-person recaps ("Diego said he'll…", "Mei volunteered to…") get the right owners |
+| **Conflict impact** | Each conflict lists the open tasks built on the old decision. Superseding lets you close them as obsolete in the same confirm, with a comment on the GitHub issue (`memory.conflict_impact`) |
+| **Spoken edits** | "make Sam own the launch announcement and push it to Friday" edits the draft: the LLM plans operations, the app applies them deterministically (`app/commands.py`) |
+| **Ask your memory** | "When did we switch to Firebase, and who decided?" is answered from stored decisions only, with checked citations (`app/ask.py`) |
+| **"May be obsolete"** | Tasks that mention something a later decision replaced are flagged in Tasks and the digest |
 
 ## Setup
 
@@ -63,35 +73,41 @@ Free keys: Gemini at https://aistudio.google.com/apikey, Groq at https://console
 
 ## 3-minute demo script
 
-**Before you start:** server running, browser on New Meeting, Wispr Flow ready.
+**Before you start:** server running, browser on New Meeting, Wispr Flow ready. Press **Reset**
+to start from the hero screen, then **Load demo meetings**, then go back to New Meeting.
 
-1. **The problem (0:00–0:15).** "Decisions change in meetings without anyone saying so, and the
-   work built on the old decision keeps going."
-2. **The hero moment (0:15–1:15).** Click **Load demo meetings**. This confirms a kickoff meeting
-   (launch Nov 23rd, Postgres, $25/seat) and stages a later sync. Review opens with **two
-   contradictions**, old and new side by side: *"Product kickoff set the database to Postgres;
-   this meeting says Firebase without acknowledging the change."* Point out that the unchanged
-   pricing was **not** flagged. Confirm is disabled. Click **Supersede old** on both.
-3. **The gate (1:15–1:40).** Click **Confirm**. The dialog lists every task, its owner and due
-   date, the tracker it goes to, and which decisions become superseded. Click **Post**. Tasks
-   opens with the GitHub issue links (or FT-n mock tickets), grouped by overdue and upcoming.
-   Diego's Postgres task now says **⚠ may be obsolete**.
-4. **Live voice (1:40–2:25).** On New Meeting, hold the Wispr Flow hotkey and speak the sprint
-   planning recap below. Mess it up on purpose ("Wednesday… actually no, Tuesday"). Press
-   Ctrl+Enter. Review shows **Speech cleanup**: utterances, filler words dropped, and
-   `Wednesday → Tuesday`. Fix an owner inline, then confirm. (Fallback: **Insert sample
-   transcript**.)
-5. **Follow-through (2:25–3:00).** Reminders: **Run reminders now** shows overdue and due-soon
-   items per person. Digest: pick **Diego**. "What changed" shows Postgres → Firebase, and "Heads
-   up" says the Postgres task may be obsolete.
+1. **The problem (0:00–0:15).** "Meeting 2 quietly undoes meeting 1, and the work built on the
+   old decision keeps going." The demo has already loaded a kickoff meeting: launch Nov 23rd,
+   Postgres, $25/seat.
+2. **Talk, and get caught live (0:15–0:50).** Hold the Wispr Flow hotkey and say the recap below.
+   As you speak, the side panel counts decisions and tasks, shows `Wednesday → Tuesday`, and then
+   flashes **⚠ Contradicts Product kickoff: launch was November 23rd** the moment you say
+   December 7th. Press **Ctrl+Enter**.
+3. **The hero moment (0:50–1:40).** Review shows the conflicts side by side with a one-line
+   explanation, and the **Impact** line: Diego's *Set up the Postgres schema* task is built on the
+   old decision. Confirm is disabled. Click **Supersede old**. Then say into the command bar:
+   *"make Sam own the launch announcement and push it to Friday"*. The edits appear as ✓ lines.
+4. **The gate (1:40–2:10).** Click **Confirm**. The dialog lists every task going to GitHub (or
+   the mock tracker), what memory will change, and offers to **close the obsolete Postgres task**.
+   Post. Tasks shows the new issues and the closed task with its reason. The header now reads
+   *conflicts caught: 2*.
+5. **Memory and follow-through (2:10–3:00).** Memory: ask *"When did we switch to Firebase, and who
+   decided?"*. The answer cites both decisions, the old one struck through. Reminders: **Run
+   reminders now**. Digest: **Diego** shows what changed and what's overdue.
 
-**Lines to dictate for step 4** (say "Priya colon" etc., or just talk and let it be Unknown):
+**Lines to dictate in step 2** (flowing speech is fine; say names with a colon, or recap style):
 
-> Priya: Okay, sprint planning, let's, um, go around. Raj?
-> Raj: So I'll finish the Firebase data model by Monday. And, uh, I'll pair with Diego on the security rules.
-> Diego: I'm going to write the security rules by Wednesday... actually no, Tuesday, so Raj can review them.
+> Priya: Okay, quick sync. Marketing wants more runway, so the launch is December 7th now.
+> Diego: I'm going to write the security rules by Wednesday... actually no, Tuesday.
 > Priya: Sam, can you finalize the onboarding checklist design by tomorrow?
-> Mei: I'll send the beta invite email by Monday.
+> Mei: I'll send the launch announcement draft by Monday.
+
+Or recap style: *"Recap of today's sync. Priya said the launch is moving to December 7th. Diego
+said he'll write the security rules by Wednesday, actually no, Tuesday. Mei volunteered to send
+the beta invite by Monday."*
+
+**Fallback** if the mic misbehaves: **Insert sample transcript** fills in the sprint planning
+meeting.
 
 ## Architecture
 
@@ -148,8 +164,9 @@ Free keys: Gemini at https://aistudio.google.com/apikey, Groq at https://console
 ## Project layout
 
 ```
-app/        FastAPI app: main.py (routes), workflow.py (stage/confirm), extraction.py,
-            speech.py, dates.py, memory.py, tracker.py, reminders.py, digest.py, llm.py, db.py
+app/        FastAPI app: main.py (routes), workflow.py (stage/preview/confirm), extraction.py,
+            speech.py, dates.py, memory.py, commands.py (spoken edits), ask.py (memory Q&A),
+            tracker.py, reminders.py, digest.py, llm.py, db.py
 frontend/   index.html, app.js, style.css (no build step)
 seed/       three scripted product meetings + meetings.json
 tests/      pytest suite incl. test_e2e.py (LLM and GitHub mocked at the network edge)
@@ -157,11 +174,13 @@ tests/      pytest suite incl. test_e2e.py (LLM and GitHub mocked at the network
 
 ## API overview
 
-`POST /api/extract` stage a meeting · `PUT /api/meetings/{id}/draft` save edits ·
-`POST /api/conflicts/{id}/resolve` · `POST /api/meetings/{id}/confirm` the gate ·
-`GET /api/memory` · `GET/PATCH /api/tasks` · `POST /api/tasks/{id}/retry` ·
-`POST /api/reminders/run` · `GET /api/notifications` · `GET /api/digest/{person}[/markdown]` ·
-`POST /api/demo/load`. Interactive docs at http://localhost:8000/docs.
+`POST /api/preview` live read while dictating · `POST /api/extract` stage a meeting ·
+`PUT /api/meetings/{id}/draft` save edits · `POST /api/meetings/{id}/command` spoken edit ·
+`POST /api/conflicts/{id}/resolve` · `POST /api/meetings/{id}/confirm` the gate (optional
+`close_task_ids`) · `GET /api/memory` · `POST /api/ask` · `GET/PATCH /api/tasks` ·
+`POST /api/tasks/{id}/retry` · `POST /api/reminders/run` · `GET /api/notifications` ·
+`GET /api/digest/{person}[/markdown]` · `GET /api/stats` · `POST /api/demo/load|reset`.
+Interactive docs at http://localhost:8000/docs.
 
 ## Limitations
 
