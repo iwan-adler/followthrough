@@ -5,7 +5,7 @@ import json
 from datetime import date, timedelta
 from pathlib import Path
 
-from . import db, digest, llm, memory, tracker
+from . import commands, db, digest, llm, memory, tracker
 from .extraction import Extraction, extract, mock_extract, postprocess
 from .speech import parse_transcript, speakers, voice_report
 
@@ -60,6 +60,16 @@ def update_draft(meeting_id: int, extraction: Extraction, title: str | None = No
                (json.dumps(ex.model_dump()), (title or m["title"]).strip(), meeting_id))
     memory.detect_conflicts(meeting_id, meeting_date, ex.decisions)
     return meeting_view(meeting_id)
+
+
+def apply_command(meeting_id: int, command: str) -> dict:
+    """Apply a spoken edit ("make Sam own the landing page and push it to Friday") to a draft."""
+    m = _require_staged(meeting_id)
+    today = date.today()  # an edit spoken now means "Friday" from today, not from the meeting
+    ex = Extraction.model_validate(m["extraction"])
+    edited, changes = commands.apply(ex, commands.plan(command, ex, today), today)
+    view = update_draft(meeting_id, edited) if changes else meeting_view(meeting_id)
+    return {**view, "changes": changes, "llm_source": llm.provider_info()["last_source"]}
 
 
 def discard_draft(meeting_id: int) -> None:

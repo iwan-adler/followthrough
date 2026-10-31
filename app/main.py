@@ -10,7 +10,7 @@ from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import db, digest, llm, memory, reminders, tracker, workflow
+from . import ask, db, digest, llm, memory, reminders, tracker, workflow
 from .extraction import Extraction
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
@@ -101,6 +101,20 @@ def update_draft(meeting_id: int, req: DraftUpdate) -> dict:
         raise HTTPException(409, str(e))
 
 
+class CommandRequest(BaseModel):
+    command: str = Field(min_length=1)
+
+
+@app.post("/api/meetings/{meeting_id}/command")
+def draft_command(meeting_id: int, req: CommandRequest) -> dict:
+    """Spoken edit to a staged draft; returns the updated draft and what changed."""
+    _meeting_or_404(meeting_id)
+    try:
+        return workflow.apply_command(meeting_id, req.command)
+    except workflow.GateError as e:
+        raise HTTPException(409, str(e))
+
+
 @app.delete("/api/meetings/{meeting_id}")
 def discard_draft(meeting_id: int) -> dict:
     _meeting_or_404(meeting_id)
@@ -137,6 +151,16 @@ def resolve_conflict(conflict_id: int, req: ResolveRequest) -> dict:
         raise HTTPException(404, str(e))
     except memory.ConflictError as e:
         raise HTTPException(409 if "confirmed" in str(e) else 400, str(e))
+
+
+class AskRequest(BaseModel):
+    question: str = Field(min_length=1)
+
+
+@app.post("/api/ask")
+def ask_memory(req: AskRequest) -> dict:
+    """Grounded Q&A over team memory, with checked citations."""
+    return ask.ask(req.question)
 
 
 @app.get("/api/memory")

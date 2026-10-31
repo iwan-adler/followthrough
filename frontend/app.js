@@ -455,6 +455,13 @@ function renderReview() {
         <div class="speakers">${draft.speakers.map((s) => `<span class="chip">${avatar(s)}${esc(s)}</span>`).join("")}</div>
         ${renderVoicePanel(draft.voice, draft.transcript)}
       </div>
+      <form class="command-bar" id="cmd-form" autocomplete="off">
+        <span class="cmd-icon" aria-hidden="true">🎙</span>
+        <input id="cmd-input" aria-label="Tell Followthrough what to change"
+          placeholder="Tell Followthrough what to change… “make Sam own the launch announcement and push it to Friday”">
+        <button class="btn primary small" id="cmd-apply">Apply</button>
+      </form>
+      <div id="cmd-result"></div>
       <div id="conflicts-box"></div>
       ${speakerOptions()}
       <div class="grid-2" style="margin-top:18px">
@@ -617,6 +624,52 @@ async function askToConfirm() {
 // Ctrl/Cmd+Enter extracts from the dictation box.
 $("#m-transcript").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) $("#m-extract").click();
+});
+
+// --- Toasts -------------------------------------------------------------------------------
+function toast(html, kind = "ok") {
+  let box = $("#toasts");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "toasts";
+    box.setAttribute("aria-live", "polite");
+    document.body.appendChild(box);
+  }
+  const el = document.createElement("div");
+  el.className = `toast ${kind}`;
+  el.innerHTML = html;
+  box.appendChild(el);
+  setTimeout(() => el.classList.add("out"), 3800);
+  setTimeout(() => el.remove(), 4300);
+}
+
+// --- Spoken edits on the Review screen --------------------------------------------------------
+$("#review-body").addEventListener("submit", async (e) => {
+  if (e.target.id !== "cmd-form") return;
+  e.preventDefault();
+  const input = $("#cmd-input");
+  const command = input.value.trim();
+  if (!command || !draft) return;
+  const result = $("#cmd-result");
+  try {
+    if (dirty || savePromise) await saveDraft();
+    const res = await withButton($("#cmd-apply"), "Applying…", () =>
+      api(`/api/meetings/${draft.id}/command`, { method: "POST", body: { command } }));
+    if (!res.changes.length) {
+      result.innerHTML = `<div class="alert">Didn't catch an edit in “${esc(command)}”. Try “assign the auth flow to Raj” or “push the launch announcement to Friday”.</div>`;
+      return;
+    }
+    Object.assign(draft, res);
+    input.value = "";
+    renderConflicts();
+    renderLists();
+    renderConfirmBar();
+    result.innerHTML = `<div class="alert ok cmd-applied">${res.changes.map((c) => `<div>✓ ${esc(c)}</div>`).join("")}</div>`;
+    toast(`✓ ${res.changes.length} change${res.changes.length === 1 ? "" : "s"} applied`);
+    refreshBadges();
+  } catch (err) {
+    result.innerHTML = `<div class="alert error">${esc(err.message)}</div>`;
+  }
 });
 
 // --- Tasks --------------------------------------------------------------------------
@@ -919,6 +972,38 @@ $("#digest-body").addEventListener("click", async (e) => {
     copy.textContent = "Copy failed";
   }
   setTimeout(() => (copy.textContent = "Copy as Markdown"), 1800);
+});
+
+// --- Ask your memory ---------------------------------------------------------------------
+$("#ask-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const question = $("#ask-input").value.trim();
+  if (!question) return;
+  const box = $("#ask-result");
+  box.innerHTML = `<div class="card answer"><span class="muted">Thinking…</span></div>`;
+  try {
+    const r = await withButton($("#ask-btn"), "Asking…", () => api("/api/ask", { method: "POST", body: { question } }));
+    const cites = [
+      ...r.decisions.map((d) => `
+        <div class="cite ${d.status}"><span class="badge topic">${esc(d.topic)}</span>
+          <span class="${d.status === "superseded" ? "struck-text" : ""}">${esc(d.text)}</span>
+          <span class="muted small">${esc(d.speaker)} · ${esc(d.meeting_title)} · ${fmtDate(d.meeting_date)}</span></div>`),
+      ...r.tasks.map((t) => `
+        <div class="cite"><span class="badge">task</span> ${esc(t.title)}
+          <span class="muted small">${esc(t.owner || "unassigned")}${t.deadline ? ` · ${fmtDate(t.deadline)}` : ""}${t.tracker_ref ? ` · ${esc(t.tracker_ref)}` : ""}</span></div>`),
+    ];
+    box.innerHTML = `
+      <div class="card answer">
+        <div class="answer-q muted small">“${esc(question)}”</div>
+        <p class="answer-text">${esc(r.answer)}</p>
+        ${cites.length ? `<div class="cites"><div class="muted tiny">SOURCES FROM MEMORY</div>${cites.join("")}</div>` : ""}
+        <div class="muted tiny">answered by ${esc(r.source)}</div>
+      </div>`;
+  } catch (err) {
+    box.innerHTML = `<div class="alert error">${esc(err.message)}</div>`;
+  } finally {
+    loadHealth();
+  }
 });
 
 // --- Memory -------------------------------------------------------------------------

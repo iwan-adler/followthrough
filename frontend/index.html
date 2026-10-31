@@ -105,7 +105,16 @@
       </div>
       <div id="tasks-body"></div>
     </section>
-    <section id="tab-memory" class="panel"><div id="memory-body"></div></section>
+    <section id="tab-memory" class="panel">
+      <form class="command-bar" id="ask-form" autocomplete="off">
+        <span class="cmd-icon" aria-hidden="true">🧠</span>
+        <input id="ask-input" aria-label="Ask your team memory"
+          placeholder="Ask your team memory… “When did we switch to Firebase, and who decided?”">
+        <button class="btn primary small" id="ask-btn">Ask</button>
+      </form>
+      <div id="ask-result"></div>
+      <div id="memory-body"></div>
+    </section>
     <section id="tab-digest" class="panel">
       <div class="card toolbar-card">
         <div>
