@@ -100,7 +100,21 @@
     </section>
     <section id="tab-memory" class="panel"><div id="memory-body"></div></section>
     <section id="tab-digest" class="panel"><div class="empty">Weekly digest arrives in step 6.</div></section>
-    <section id="tab-reminders" class="panel"><div class="empty">Reminders arrive in step 5.</div></section>
+    <section id="tab-reminders" class="panel">
+      <div class="card toolbar-card">
+        <div>
+          <strong>Deadline reminders</strong>
+          <div id="reminder-status" class="muted small">Checking scheduler…</div>
+        </div>
+        <div class="actions">
+          <select id="notif-person" aria-label="Filter by person"><option value="">Everyone</option></select>
+          <button id="notif-read-all" class="btn ghost">Mark all read</button>
+          <button id="run-reminders" class="btn primary">⏰ Run reminders now</button>
+        </div>
+      </div>
+      <div id="reminder-banner"></div>
+      <div id="notif-body"></div>
+    </section>
   </main>
 
   <script src="app.js"></script>

@@ -56,7 +56,9 @@ async function withButton(btn, busyText, fn) {
 }
 
 // --- tabs -------------------------------------------------------------------------
-const TAB_LOADERS = { review: () => loadReview(), tasks: () => loadTasks(), memory: () => loadMemory() };
+const TAB_LOADERS = {
+  review: () => loadReview(), tasks: () => loadTasks(), memory: () => loadMemory(), reminders: () => loadReminders(),
+};
 
 function showTab(name) {
   document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === name));
@@ -66,11 +68,16 @@ function showTab(name) {
 document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => showTab(t.dataset.tab)));
 
 async function refreshBadges() {
+  const badge = (tab, label, n) => {
+    document.querySelector(`.tab[data-tab="${tab}"]`).innerHTML = `${label}${n ? `<span class="count">${n}</span>` : ""}`;
+  };
   try {
-    const open = await api("/api/conflicts?open_only=true");
-    const tab = document.querySelector('.tab[data-tab="review"]');
-    tab.innerHTML = `Review${open.length ? `<span class="count">${open.length}</span>` : ""}`;
-  } catch { /* badge is cosmetic */ }
+    const [open, unread] = await Promise.all([
+      api("/api/conflicts?open_only=true"), api("/api/notifications?unread_only=true"),
+    ]);
+    badge("review", "Review", open.length);
+    badge("reminders", "Reminders", unread.length);
+  } catch { /* badges are cosmetic */ }
 }
 
 // --- LLM badge --------------------------------------------------------------------
@@ -588,6 +595,94 @@ $("#tasks-body").addEventListener("change", async (e) => {
   }
   loadTasks();
 });
+
+// --- Reminders ----------------------------------------------------------------------
+function fmtTime(iso) {
+  if (!iso) return "never";
+  const d = new Date(iso.replace(" ", "T"));
+  return d.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
+}
+
+async function loadReminderStatus() {
+  try {
+    const s = await api("/api/reminders/status");
+    $("#reminder-status").textContent = s.scheduler_running
+      ? `Background check every ${s.interval_minutes} min · last run ${fmtTime(s.last_run)} · next ${fmtTime(s.next_run)}`
+      : `Background scheduler off · last run ${fmtTime(s.last_run)}`;
+  } catch {
+    $("#reminder-status").textContent = "Scheduler status unavailable";
+  }
+}
+
+function renderNotification(n) {
+  const overdue = n.kind === "overdue";
+  return `
+    <div class="item notif ${n.read ? "read" : ""} ${overdue ? "overdue" : "soon"}">
+      <div class="notif-icon">${overdue ? "🔴" : "⏰"}</div>
+      <div class="task-main">
+        <div class="title">${esc(n.message)}</div>
+        <div class="meta">
+          ${avatar(n.person)} ${esc(n.person)}
+          <span class="badge ${overdue ? "due-overdue" : "due-soon"}">${overdue ? "overdue" : "due soon"}</span>
+          ${n.tracker_ref ? `<span class="badge topic">${esc(n.tracker_ref)}</span>` : ""}
+          <span class="muted small">${fmtTime(n.created_at)}</span>
+        </div>
+      </div>
+      ${n.read ? "" : `<button class="btn small ghost" data-read="${n.id}">Mark read</button>`}
+    </div>`;
+}
+
+async function loadReminders() {
+  loadReminderStatus();
+  const body = $("#notif-body");
+  if (!body.children.length) loading(body);
+  try {
+    const all = await api("/api/notifications");
+    const sel = $("#notif-person");
+    const people = [...new Set(all.map((n) => n.person))].sort();
+    const current = sel.value;
+    sel.innerHTML = `<option value="">Everyone</option>` + people.map((p) => `<option ${p === current ? "selected" : ""}>${esc(p)}</option>`).join("");
+    const list = all.filter((n) => !sel.value || n.person === sel.value);
+    body.innerHTML = list.length
+      ? list.map(renderNotification).join("")
+      : `<div class="empty">No reminders yet. Items due within 24 hours or overdue show up here. Try “Run reminders now”.</div>`;
+  } catch (err) {
+    body.innerHTML = `<div class="alert error">${esc(err.message)}</div>`;
+  }
+}
+
+$("#notif-person").addEventListener("change", loadReminders);
+
+$("#run-reminders").addEventListener("click", async (e) => {
+  try {
+    const res = await withButton(e.currentTarget, "Checking…", () => api("/api/reminders/run", { method: "POST" }));
+    const n = res.created.length;
+    $("#reminder-banner").innerHTML = `<div class="alert ${n ? "ok" : ""}">${n
+      ? `✓ Created ${n} reminder${n === 1 ? "" : "s"}.`
+      : "No new reminders: everything due soon or overdue has already been flagged today."}</div>`;
+  } catch (err) {
+    $("#reminder-banner").innerHTML = `<div class="alert error">${esc(err.message)}</div>`;
+  }
+  loadReminders();
+  refreshBadges();
+});
+
+$("#notif-read-all").addEventListener("click", async () => {
+  await api("/api/notifications/read-all", { method: "POST" }).catch(() => {});
+  loadReminders();
+  refreshBadges();
+});
+
+$("#notif-body").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-read]");
+  if (!b) return;
+  await api(`/api/notifications/${b.dataset.read}/read`, { method: "POST" }).catch(() => {});
+  loadReminders();
+  refreshBadges();
+});
+
+// The scheduler creates reminders in the background; keep the tab badge current.
+setInterval(refreshBadges, 60000);
 
 // --- Memory -------------------------------------------------------------------------
 async function loadMemory() {

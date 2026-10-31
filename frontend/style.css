@@ -243,3 +243,13 @@ textarea.inline { resize: vertical; width: 100%; line-height: 1.45; font-size: 1
 .badge.due-soon { background: var(--warn-soft); color: var(--warn); }
 a.badge { text-decoration: none; }
 a.badge:hover { filter: brightness(1.1); }
+
+/* --- reminders ------------------------------------------------------------------------ */
+.toolbar-card { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; padding: 14px 20px; }
+.toolbar-card select { width: auto; padding: 8px 10px; font-size: 14px; }
+.item.notif { display: flex; gap: 12px; align-items: flex-start; }
+.item.notif.overdue:not(.read) { box-shadow: inset 3px 0 0 var(--danger); }
+.item.notif.soon:not(.read) { box-shadow: inset 3px 0 0 var(--warn); }
+.item.notif.read { opacity: .6; }
+.notif-icon { font-size: 18px; line-height: 1.4; }
+.alert:not(.ok):not(.error) { background: var(--surface-2); color: var(--muted); }

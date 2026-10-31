@@ -18,6 +18,7 @@ class Settings:
     github_user_map: str
     db_path: str
     reminder_interval_minutes: int
+    scheduler_enabled: bool
 
 
 def settings() -> Settings:
@@ -32,4 +33,5 @@ def settings() -> Settings:
         github_user_map=env("GITHUB_USER_MAP", ""),
         db_path=env("DB_PATH", "followthrough.db"),
         reminder_interval_minutes=int(env("REMINDER_INTERVAL_MINUTES", "15")),
+        scheduler_enabled=env("SCHEDULER_ENABLED", "true").strip().lower() not in ("0", "false", "no"),
     )

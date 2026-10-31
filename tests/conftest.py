@@ -8,6 +8,7 @@ def isolated_env(tmp_path, monkeypatch):
     monkeypatch.setenv("DB_PATH", str(tmp_path / "test.db"))
     monkeypatch.setenv("LLM_API_KEY", "")
     monkeypatch.setenv("GITHUB_TOKEN", "")
+    monkeypatch.setenv("SCHEDULER_ENABLED", "false")
 
 
 @pytest.fixture

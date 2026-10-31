@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import db, llm, memory, tracker, workflow
+from . import db, llm, memory, reminders, tracker, workflow
 from .extraction import Extraction
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
@@ -18,7 +18,9 @@ FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     db.init_db()
+    reminders.start()
     yield
+    reminders.stop()
 
 
 app = FastAPI(title="Followthrough", lifespan=lifespan)
@@ -189,6 +191,41 @@ def retry_task(task_id: int) -> dict:
         raise HTTPException(409, "Already posted to the tracker.")
     tracker.post(task_id)
     return _task_or_404(task_id)
+
+
+@app.post("/api/reminders/run")
+def run_reminders() -> dict:
+    """Same sweep the background scheduler runs; exposed for the demo."""
+    return {"created": reminders.run_reminders(), "status": reminders.status()}
+
+
+@app.get("/api/reminders/status")
+def reminder_status() -> dict:
+    return reminders.status()
+
+
+@app.get("/api/notifications")
+def list_notifications(person: str | None = None, unread_only: bool = False) -> list[dict]:
+    sql, params = ("SELECT n.*, a.title AS task_title, a.deadline, a.tracker_url, a.tracker_ref "
+                   "FROM notifications n LEFT JOIN action_items a ON a.id = n.action_item_id WHERE 1 = 1"), []
+    if person:
+        sql += " AND lower(n.person) = lower(?)"
+        params.append(person)
+    if unread_only:
+        sql += " AND n.read = 0"
+    return db.rows(sql + " ORDER BY n.read, n.created_at DESC, n.id DESC", tuple(params))
+
+
+@app.post("/api/notifications/{notification_id}/read")
+def mark_read(notification_id: int) -> dict:
+    db.execute("UPDATE notifications SET read = 1 WHERE id = ?", (notification_id,))
+    return {"ok": True}
+
+
+@app.post("/api/notifications/read-all")
+def mark_all_read() -> dict:
+    db.execute("UPDATE notifications SET read = 1 WHERE read = 0")
+    return {"ok": True}
 
 
 @app.get("/api/demo/transcripts")
