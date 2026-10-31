@@ -6,7 +6,8 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from . import db, llm, memory
-from .extraction import Extraction, extract
+from .extraction import Extraction, extract, postprocess
+from .speech import parse_transcript
 
 SEED_DIR = Path(__file__).resolve().parent.parent / "seed"
 
@@ -35,6 +36,35 @@ def stage_meeting(transcript: str, meeting_date: date, title: str) -> dict:
     view["utterances"] = [{"speaker": u.speaker, "text": u.text} for u in utterances]
     view["llm_source"] = extraction_source
     return view
+
+
+def _require_staged(meeting_id: int) -> dict:
+    m = db.get_meeting(meeting_id)
+    if not m:
+        raise LookupError("Meeting not found.")
+    if m["status"] != "staged":
+        raise GateError("This meeting is already confirmed and can no longer be edited.")
+    return m
+
+
+def update_draft(meeting_id: int, extraction: Extraction, title: str | None = None) -> dict:
+    """Save inline edits from the review screen and re-check conflicts."""
+    m = _require_staged(meeting_id)
+    meeting_date = date.fromisoformat(m["meeting_date"])
+    extraction.decisions = [d for d in extraction.decisions if d.text.strip()]
+    extraction.action_items = [a for a in extraction.action_items if a.title.strip()]
+    ex = postprocess(extraction, parse_transcript(m["transcript"]), meeting_date)
+    db.execute("UPDATE meetings SET extraction = ?, title = ? WHERE id = ?",
+               (json.dumps(ex.model_dump()), (title or m["title"]).strip(), meeting_id))
+    memory.detect_conflicts(meeting_id, meeting_date, ex.decisions)
+    return meeting_view(meeting_id)
+
+
+def discard_draft(meeting_id: int) -> None:
+    _require_staged(meeting_id)
+    with db.connect() as conn:
+        conn.execute("DELETE FROM conflicts WHERE meeting_id = ?", (meeting_id,))
+        conn.execute("DELETE FROM meetings WHERE id = ?", (meeting_id,))
 
 
 def confirm_meeting(meeting_id: int) -> dict:

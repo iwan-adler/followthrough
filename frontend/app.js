@@ -149,16 +149,22 @@ $("#demo-sample").addEventListener("click", async () => {
   }
 });
 
-// --- Review -------------------------------------------------------------------------
+// --- Review (editable draft + confirmation gate) ---------------------------------------
 let reviewMeetingId = null;
+let draft = null;            // the staged meeting being edited
+let saveTimer = null;
+let savePromise = null;
+let dirty = false;
 
 async function loadReview() {
   const body = $("#review-body");
+  if (dirty) await saveDraft().catch(() => {});
   try {
     const staged = (await api("/api/meetings")).filter((m) => m.status === "staged");
     const picker = $("#review-picker");
     if (!staged.length) {
       picker.hidden = true;
+      draft = null;
       body.innerHTML = `<div class="empty">Nothing waiting for review. Extract a meeting or load the demo.</div>`;
       return;
     }
@@ -168,15 +174,75 @@ async function loadReview() {
       .map((m) => `<option value="${m.id}" ${m.id === reviewMeetingId ? "selected" : ""}>${esc(m.title)} · ${fmtDate(m.meeting_date)}</option>`)
       .join("");
     if (!body.querySelector(`[data-meeting="${reviewMeetingId}"]`)) loading(body);
-    renderReview(await api(`/api/meetings/${reviewMeetingId}`));
+    draft = await api(`/api/meetings/${reviewMeetingId}`);
+    renderReview();
   } catch (err) {
     body.innerHTML = `<div class="alert error">${esc(err.message)}</div>`;
   }
 }
-$("#review-select").addEventListener("change", (e) => {
+$("#review-select").addEventListener("change", async (e) => {
+  if (dirty) await saveDraft().catch(() => {});
   reviewMeetingId = Number(e.target.value);
   loadReview();
 });
+
+// Blank rows stay on screen while being filled in but are never sent to the server,
+// so map each row to its index among the non-blank decisions (what conflicts refer to).
+function serverIndex(list, i, field) {
+  if (!list[i][field]?.trim()) return -1;
+  return list.slice(0, i).filter((x) => x[field]?.trim()).length;
+}
+
+function payload() {
+  return {
+    title: draft.title,
+    extraction: {
+      ...draft.extraction,
+      decisions: draft.extraction.decisions.filter((d) => d.text.trim()),
+      action_items: draft.extraction.action_items.filter((a) => a.title.trim()),
+    },
+  };
+}
+
+function setSaveStatus(text, isError = false) {
+  const el = $("#save-status");
+  if (el) {
+    el.textContent = text;
+    el.classList.toggle("error-text", isError);
+  }
+}
+
+function scheduleSave() {
+  dirty = true;
+  setSaveStatus("Unsaved changes…");
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => saveDraft().catch(() => {}), 700);
+}
+
+async function saveDraft() {
+  clearTimeout(saveTimer);
+  if (!dirty) return savePromise;
+  dirty = false;
+  setSaveStatus("Saving…");
+  const id = draft.id;
+  savePromise = api(`/api/meetings/${id}/draft`, { method: "PUT", body: payload() })
+    .then((m) => {
+      if (!draft || draft.id !== id) return;
+      draft.conflicts = m.conflicts;
+      draft.open_conflicts = m.open_conflicts;
+      renderConflicts();
+      renderConfirmBar();
+      markConflictedDecisions();
+      setSaveStatus(dirty ? "Unsaved changes…" : "All changes saved");
+      refreshBadges();
+    })
+    .catch((e) => {
+      dirty = true;
+      setSaveStatus(`Save failed: ${e.message}`, true);
+      throw e;
+    });
+  return savePromise;
+}
 
 const RESOLUTION_TEXT = {
   supersede: "New decision replaces the earlier one",
@@ -218,88 +284,199 @@ function renderConflict(c) {
     </div>`;
 }
 
-function renderDecision(d) {
+function renderConflicts() {
+  const n = draft.conflicts.length;
+  $("#conflicts-box").innerHTML = n
+    ? `<h3 class="section-title">⚠ ${n} conflict${n > 1 ? "s" : ""} with earlier decisions</h3>${draft.conflicts.map(renderConflict).join("")}`
+    : `<div class="alert ok">✓ No conflicts with earlier decisions in memory.</div>`;
+}
+
+function speakerOptions() {
+  return `<datalist id="people-list">${draft.speakers.filter((s) => s !== "Unknown").map((s) => `<option value="${esc(s)}">`).join("")}</datalist>`;
+}
+
+function renderDecisionRow(d, i) {
   return `
-    <div class="item">
-      <div class="title">${esc(d.text)}</div>
+    <div class="item edit" data-kind="decisions" data-i="${i}">
+      <div class="edit-main">
+        <textarea class="inline title-input" rows="2" data-field="text" placeholder="What was decided?">${esc(d.text)}</textarea>
+        <button class="icon-btn" data-delete title="Remove decision">✕</button>
+      </div>
       <div class="meta">
-        <span class="badge topic">${esc(d.topic)}</span>
-        ${avatar(d.speaker)} ${esc(d.speaker)} · ${confidence(d.confidence)}
+        <label class="mini">topic <input class="inline sm" data-field="topic" value="${esc(d.topic)}" placeholder="topic"></label>
+        <label class="mini">by <input class="inline sm" data-field="speaker" list="people-list" value="${esc(d.speaker)}" placeholder="speaker"></label>
+        ${d.confidence != null ? confidence(d.confidence) : ""}
+        <span class="badge kind-contradiction conflict-flag" hidden>conflict</span>
       </div>
       ${d.evidence ? `<div class="evidence">“${esc(d.evidence)}”</div>` : ""}
     </div>`;
 }
 
-function renderAction(a) {
+function actionFlags(a) {
+  return `${!a.owner?.trim() ? `<span class="badge flag">needs owner</span>` : ""}${!a.deadline ? `<span class="badge flag">needs deadline</span>` : ""}`;
+}
+
+function renderActionRow(a, i) {
   return `
-    <div class="item">
-      <div class="title">${esc(a.title)}</div>
+    <div class="item edit" data-kind="action_items" data-i="${i}">
+      <div class="edit-main">
+        <input class="inline title-input" data-field="title" value="${esc(a.title)}" placeholder="What needs to happen?">
+        <button class="icon-btn" data-delete title="Remove action item">✕</button>
+      </div>
       <div class="meta">
-        ${a.owner ? `${avatar(a.owner)} ${esc(a.owner)}` : ""}
-        ${a.deadline ? `<span class="badge">📅 ${fmtDate(a.deadline)}${a.deadline_text ? ` · “${esc(a.deadline_text)}”` : ""}</span>` : ""}
-        ${a.needs_owner ? `<span class="badge flag">needs owner</span>` : ""}
-        ${a.needs_deadline ? `<span class="badge flag">needs deadline</span>` : ""}
-        ${confidence(a.confidence)}
+        <label class="mini">owner <input class="inline sm" data-field="owner" list="people-list" value="${esc(a.owner ?? "")}" placeholder="unassigned"></label>
+        <label class="mini">due <input class="inline sm" type="date" data-field="deadline" value="${esc(a.deadline ?? "")}"></label>
+        ${a.deadline_text ? `<span class="muted small" title="As spoken">“${esc(a.deadline_text)}”</span>` : ""}
+        <span class="flags">${actionFlags(a)}</span>
+        ${a.confidence != null ? confidence(a.confidence) : ""}
       </div>
       ${a.evidence ? `<div class="evidence">“${esc(a.evidence)}”</div>` : ""}
     </div>`;
 }
 
-function renderReview(m) {
-  const ex = m.extraction;
-  const open = m.open_conflicts;
-  $("#review-body").innerHTML = `
-    <div data-meeting="${m.id}">
-      <div class="card">
-        <h2>${esc(m.title)} <span class="muted small">· ${fmtDate(m.meeting_date)}</span></h2>
-        <p class="muted">${esc(m.summary)}</p>
-        <div class="speakers">${m.speakers.map((s) => `<span class="chip">${avatar(s)}${esc(s)}</span>`).join("")}</div>
-      </div>
-
-      ${m.conflicts.length ? `
-        <h3 class="section-title">⚠ ${m.conflicts.length} conflict${m.conflicts.length > 1 ? "s" : ""} with earlier decisions</h3>
-        ${m.conflicts.map(renderConflict).join("")}` : `
-        <div class="alert ok">✓ No conflicts with earlier decisions in memory.</div>`}
-
-      <div class="grid-2" style="margin-top:18px">
-        <div class="card"><h3>Decisions (${ex.decisions.length})</h3>${ex.decisions.map(renderDecision).join("") || `<p class="muted small">No decisions found.</p>`}</div>
-        <div class="card"><h3>Action items (${ex.action_items.length})</h3>${ex.action_items.map(renderAction).join("") || `<p class="muted small">No action items found.</p>`}</div>
-      </div>
-
-      <div class="confirm-bar">
-        <span class="msg">${open
-          ? `<strong>Resolve ${open} conflict${open > 1 ? "s" : ""}</strong> to confirm. Nothing has been saved yet.`
-          : `Nothing is saved to memory or posted anywhere until you confirm.`}</span>
-        <button id="confirm-btn" class="btn primary" ${open ? "disabled" : ""}>Confirm &amp; save</button>
-      </div>
-      <div id="review-error" class="alert error" hidden></div>
-    </div>`;
+function renderLists() {
+  const ex = draft.extraction;
+  $("#decisions-box").innerHTML = `
+    <h3>Decisions (${ex.decisions.length})</h3>
+    ${ex.decisions.map(renderDecisionRow).join("") || `<p class="muted small">No decisions found.</p>`}
+    <button class="btn small ghost" data-add="decisions">+ Add decision</button>`;
+  $("#actions-box").innerHTML = `
+    <h3>Action items (${ex.action_items.length})</h3>
+    ${ex.action_items.map(renderActionRow).join("") || `<p class="muted small">No action items found.</p>`}
+    <button class="btn small ghost" data-add="action_items">+ Add action item</button>`;
+  markConflictedDecisions();
 }
 
+function markConflictedDecisions() {
+  const open = new Set(draft.conflicts.filter((c) => !c.resolution).map((c) => c.new_decision_index));
+  document.querySelectorAll('#decisions-box .item[data-kind="decisions"]').forEach((row) => {
+    const idx = serverIndex(draft.extraction.decisions, Number(row.dataset.i), "text");
+    const flagged = open.has(idx);
+    row.classList.toggle("has-conflict", flagged);
+    row.querySelector(".conflict-flag").hidden = !flagged;
+  });
+}
+
+function renderConfirmBar() {
+  const open = draft.open_conflicts;
+  const items = draft.extraction.action_items.filter((a) => a.title.trim());
+  const noOwner = items.filter((a) => !a.owner?.trim()).length;
+  const noDate = items.filter((a) => !a.deadline).length;
+  const warnings = [noOwner && `${noOwner} without an owner`, noDate && `${noDate} without a deadline`].filter(Boolean);
+  $("#confirm-bar").innerHTML = `
+    <span class="msg">${open
+      ? `<strong>Resolve ${open} conflict${open > 1 ? "s" : ""}</strong> to confirm. Nothing has been saved yet.`
+      : `Nothing is saved to memory or posted to the tracker until you confirm.`}
+      ${warnings.length ? `<br><span class="warn-text">⚠ ${items.length} task${items.length === 1 ? "" : "s"}: ${warnings.join(", ")}.</span>` : ""}
+      <br><span id="save-status" class="muted small">${dirty ? "Unsaved changes…" : "All changes saved"}</span></span>
+    <button id="discard-btn" class="btn ghost">Discard draft</button>
+    <button id="confirm-btn" class="btn primary" ${open ? "disabled" : ""}>Confirm &amp; create ${items.length} task${items.length === 1 ? "" : "s"}</button>`;
+}
+
+function renderReview() {
+  $("#review-body").innerHTML = `
+    <div data-meeting="${draft.id}">
+      <div class="card">
+        <input id="draft-title" class="inline heading-input" value="${esc(draft.title)}" aria-label="Meeting title">
+        <span class="muted small">${fmtDate(draft.meeting_date)} · draft #${draft.id} · click any text to edit</span>
+        <p class="muted">${esc(draft.summary)}</p>
+        <div class="speakers">${draft.speakers.map((s) => `<span class="chip">${avatar(s)}${esc(s)}</span>`).join("")}</div>
+      </div>
+      <div id="conflicts-box"></div>
+      ${speakerOptions()}
+      <div class="grid-2" style="margin-top:18px">
+        <div class="card" id="decisions-box"></div>
+        <div class="card" id="actions-box"></div>
+      </div>
+      <div class="confirm-bar" id="confirm-bar"></div>
+      <div id="review-error" class="alert error" hidden></div>
+    </div>`;
+  renderConflicts();
+  renderLists();
+  renderConfirmBar();
+}
+
+function showReviewError(msg) {
+  const box = $("#review-error");
+  if (box) {
+    box.textContent = msg;
+    box.hidden = !msg;
+  }
+}
+
+$("#review-body").addEventListener("input", (e) => {
+  if (!draft) return;
+  if (e.target.id === "draft-title") {
+    draft.title = e.target.value;
+    return scheduleSave();
+  }
+  const field = e.target.dataset.field;
+  const row = e.target.closest("[data-kind]");
+  if (!field || !row) return;
+  const item = draft.extraction[row.dataset.kind][Number(row.dataset.i)];
+  item[field] = e.target.value || (field === "deadline" || field === "owner" ? null : "");
+  if (field === "deadline") item.deadline_text = null;  // explicit date wins over the spoken phrase
+  if (row.dataset.kind === "action_items") {
+    row.querySelector(".flags").innerHTML = actionFlags(item);
+    renderConfirmBar();
+  }
+  scheduleSave();
+});
+
 $("#review-body").addEventListener("click", async (e) => {
-  const resolveBtn = e.target.closest("[data-resolve]");
-  const errBox = $("#review-error");
+  const t = e.target;
   try {
-    if (resolveBtn) {
-      await api(`/api/conflicts/${resolveBtn.dataset.conflict}/resolve`, {
-        method: "POST", body: { resolution: resolveBtn.dataset.resolve },
-      });
-      await loadReview();
+    if (t.closest("[data-resolve]")) {
+      const b = t.closest("[data-resolve]");
+      if (dirty) await saveDraft();
+      await api(`/api/conflicts/${b.dataset.conflict}/resolve`, { method: "POST", body: { resolution: b.dataset.resolve } });
+      const m = await api(`/api/meetings/${draft.id}`);
+      draft.conflicts = m.conflicts;
+      draft.open_conflicts = m.open_conflicts;
+      renderConflicts();
+      renderConfirmBar();
+      markConflictedDecisions();
       refreshBadges();
-    } else if (e.target.closest("#confirm-btn")) {
-      await withButton(e.target.closest("#confirm-btn"), "Confirming…", () =>
-        api(`/api/meetings/${reviewMeetingId}/confirm`, { method: "POST" }));
+    } else if (t.closest("[data-add]")) {
+      const kind = t.closest("[data-add]").dataset.add;
+      draft.extraction[kind].push(kind === "decisions"
+        ? { text: "", topic: "", speaker: draft.speakers[0] || "Unknown", confidence: 1, evidence: "" }
+        : { title: "", owner: null, deadline: null, deadline_text: null, speaker: "Unknown", confidence: 1, evidence: "", needs_owner: true, needs_deadline: true });
+      renderLists();
+      renderConfirmBar();
+      const rows = document.querySelectorAll(`[data-kind="${kind}"]`);
+      rows[rows.length - 1]?.querySelector(".title-input")?.focus();
+    } else if (t.closest("[data-delete]")) {
+      const row = t.closest("[data-kind]");
+      draft.extraction[row.dataset.kind].splice(Number(row.dataset.i), 1);
+      renderLists();
+      renderConfirmBar();
+      scheduleSave();
+    } else if (t.closest("#discard-btn")) {
+      if (!window.confirm("Discard this draft? Nothing from it will be saved.")) return;
+      clearTimeout(saveTimer);
+      dirty = false;
+      await api(`/api/meetings/${draft.id}`, { method: "DELETE" });
       reviewMeetingId = null;
       refreshBadges();
-      showTab("memory");
+      loadReview();
+    } else if (t.closest("#confirm-btn")) {
+      const btn = t.closest("#confirm-btn");
+      await withButton(btn, "Confirming…", async () => {
+        if (dirty || savePromise) await saveDraft();
+        return api(`/api/meetings/${draft.id}/confirm`, { method: "POST" });
+      });
+      reviewMeetingId = null;
+      draft = null;
+      refreshBadges();
+      showTab(TAB_AFTER_CONFIRM);
     }
   } catch (err) {
-    if (errBox) {
-      errBox.textContent = err.message;
-      errBox.hidden = false;
-    }
+    showReviewError(err.message);
   }
 });
+
+const TAB_AFTER_CONFIRM = "memory";
 
 // --- Memory -------------------------------------------------------------------------
 async function loadMemory() {

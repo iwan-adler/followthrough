@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import db, llm, memory, workflow
+from .extraction import Extraction
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
@@ -61,6 +62,30 @@ def list_meetings() -> list[dict]:
 @app.get("/api/meetings/{meeting_id}")
 def get_meeting(meeting_id: int) -> dict:
     return _meeting_or_404(meeting_id)
+
+
+class DraftUpdate(BaseModel):
+    extraction: Extraction
+    title: str | None = None
+
+
+@app.put("/api/meetings/{meeting_id}/draft")
+def update_draft(meeting_id: int, req: DraftUpdate) -> dict:
+    _meeting_or_404(meeting_id)
+    try:
+        return workflow.update_draft(meeting_id, req.extraction, req.title)
+    except workflow.GateError as e:
+        raise HTTPException(409, str(e))
+
+
+@app.delete("/api/meetings/{meeting_id}")
+def discard_draft(meeting_id: int) -> dict:
+    _meeting_or_404(meeting_id)
+    try:
+        workflow.discard_draft(meeting_id)
+    except workflow.GateError as e:
+        raise HTTPException(409, str(e))
+    return {"ok": True}
 
 
 @app.post("/api/meetings/{meeting_id}/confirm")

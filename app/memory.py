@@ -187,8 +187,9 @@ def mock_judge(pairs: list[tuple[int, ExtractedDecision, dict]]) -> Judgments:
 # --- detection & resolution --------------------------------------------------------------
 
 def detect_conflicts(meeting_id: int, meeting_date: date, decisions: list[ExtractedDecision]) -> list[dict]:
-    """(Re)compute conflicts for a staged meeting, keeping resolutions already chosen."""
-    previous = {(c["new_decision_index"], c["old_decision_id"]): c["resolution"]
+    """(Re)compute conflicts for a staged meeting. A resolution already chosen is kept while
+    the new decision's text is unchanged; editing the text asks the question again."""
+    previous = {(c["new_decision"], c["old_decision_id"]): c["resolution"]
                 for c in list_conflicts(meeting_id)}
     db.execute("DELETE FROM conflicts WHERE meeting_id = ?", (meeting_id,))
 
@@ -214,7 +215,7 @@ def detect_conflicts(meeting_id: int, meeting_date: date, decisions: list[Extrac
             "INSERT INTO conflicts (meeting_id, new_decision, new_decision_index, new_speaker, "
             "old_decision_id, kind, explanation, resolution) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (meeting_id, new.text, j.new_index, new.speaker, j.old_id, j.verdict,
-             j.explanation.strip(), previous.get(key)),
+             j.explanation.strip(), previous.get((new.text, j.old_id))),
         )
     return list_conflicts(meeting_id)
 
