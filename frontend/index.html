@@ -17,7 +17,10 @@
         <p class="tagline">From what was said to what gets done</p>
       </div>
     </div>
-    <span id="llm-badge" class="badge muted" title="LLM provider">checking LLM…</span>
+    <div class="header-right">
+      <div id="stats" class="stats" aria-label="At a glance"></div>
+      <span id="llm-badge" class="badge muted" title="LLM provider">checking LLM…</span>
+    </div>
   </header>
 
   <nav class="tabs" role="tablist">
@@ -32,12 +35,23 @@
   <main>
     <!-- New Meeting -->
     <section id="tab-new" class="panel active">
+      <div id="hero" class="hero" hidden>
+        <h2>Meetings decide things. Then nobody follows through.</h2>
+        <p>Followthrough listens to your meeting recap, turns it into owned, dated work, and catches the moment
+          a new meeting quietly contradicts an old decision, before the wrong work gets done.</p>
+        <ol class="hero-steps">
+          <li><span>🎙</span><strong>Talk</strong>Dictate with Wispr Flow. Filler and self-corrections are handled.</li>
+          <li><span>⚠</span><strong>Catch</strong>New decisions are checked against everything the team decided before.</li>
+          <li><span>✅</span><strong>Confirm</strong>Nothing is posted until you review it. Then issues, reminders and digests follow.</li>
+        </ol>
+      </div>
       <div class="card demo-bar">
         <div>
           <strong>Demo mode</strong>
           <span class="muted small">Loads a confirmed kickoff meeting, then stages a later meeting that quietly contradicts it.</span>
         </div>
         <div class="actions">
+          <button id="demo-reset" class="btn ghost" title="Delete all meetings, decisions and tasks">Reset</button>
           <button id="demo-sample" class="btn secondary">Insert sample transcript</button>
           <button id="demo-load" class="btn primary">Load demo meetings</button>
         </div>

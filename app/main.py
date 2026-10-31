@@ -58,6 +58,22 @@ def health() -> dict:
     return {"ok": True, "llm": llm.provider_info()}
 
 
+@app.get("/api/stats")
+def stats() -> dict:
+    """Headline numbers for the header: what Followthrough has caught and is tracking."""
+    one = lambda sql: db.row(sql)["n"]
+    return {
+        "meetings": one("SELECT count(*) AS n FROM meetings WHERE status = 'confirmed'"),
+        "decisions": one("SELECT count(*) AS n FROM decisions WHERE status = 'active'"),
+        "superseded": one("SELECT count(*) AS n FROM decisions WHERE status = 'superseded'"),
+        "open_tasks": one("SELECT count(*) AS n FROM action_items WHERE status = 'open'"),
+        "overdue": one("SELECT count(*) AS n FROM action_items WHERE status = 'open' "
+                       "AND deadline < date('now', 'localtime')"),
+        "conflicts_caught": one("SELECT count(*) AS n FROM conflicts"),
+        "obsolete_closed": one("SELECT count(*) AS n FROM action_items WHERE status = 'cancelled'"),
+    }
+
+
 @app.post("/api/extract")
 def extract_meeting(req: ExtractRequest) -> dict:
     """Extract, stage and check for conflicts. Nothing is committed to memory or the tracker."""
@@ -288,6 +304,13 @@ def person_digest_markdown(person: str) -> str:
 @app.get("/api/demo/transcripts")
 def demo_transcripts() -> list[dict]:
     return workflow.demo_transcripts()
+
+
+@app.post("/api/demo/reset")
+def reset_demo() -> dict:
+    """Wipe everything, for rehearsing the demo from a clean slate."""
+    db.reset()
+    return {"ok": True}
 
 
 @app.post("/api/demo/load")

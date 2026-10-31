@@ -69,6 +69,7 @@ function showTab(name) {
 document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => showTab(t.dataset.tab)));
 
 async function refreshBadges() {
+  loadStats();
   const badge = (tab, label, n) => {
     document.querySelector(`.tab[data-tab="${tab}"]`).innerHTML = `${label}${n ? `<span class="count">${n}</span>` : ""}`;
   };
@@ -79,6 +80,21 @@ async function refreshBadges() {
     badge("review", "Review", open.length);
     badge("reminders", "Reminders", unread.length);
   } catch { /* badges are cosmetic */ }
+}
+
+// --- Header stats & first-run hero ----------------------------------------------------------
+async function loadStats() {
+  try {
+    const s = await api("/api/stats");
+    const stat = (n, label, cls = "") => `<span class="stat ${cls}"><strong>${n}</strong> ${label}</span>`;
+    $("#stats").innerHTML = [
+      stat(s.decisions, "decisions"),
+      stat(s.open_tasks, "open tasks"),
+      s.overdue ? stat(s.overdue, "overdue", "warn") : "",
+      stat(s.conflicts_caught, `conflict${s.conflicts_caught === 1 ? "" : "s"} caught`, s.conflicts_caught ? "hot" : ""),
+    ].join("");
+    $("#hero").hidden = s.meetings > 0;
+  } catch { /* cosmetic */ }
 }
 
 // --- LLM badge --------------------------------------------------------------------
@@ -145,6 +161,16 @@ $("#demo-load").addEventListener("click", async (e) => {
   } catch (err) {
     showNewError(err.message);
   }
+});
+
+$("#demo-reset").addEventListener("click", async () => {
+  if (!window.confirm("Delete all meetings, decisions, tasks and reminders?")) return;
+  await api("/api/demo/reset", { method: "POST" }).catch((err) => toast(esc(err.message), "error"));
+  reviewMeetingId = null;
+  digestPerson = null;
+  ["#memory-body", "#tasks-body", "#notif-body", "#ask-result"].forEach((sel) => ($(sel).innerHTML = ""));
+  refreshBadges();
+  toast("Clean slate. Load the demo or start dictating.");
 });
 
 $("#demo-sample").addEventListener("click", async () => {
@@ -510,6 +536,7 @@ $("#review-body").addEventListener("click", async (e) => {
       const b = t.closest("[data-resolve]");
       if (dirty) await saveDraft();
       await api(`/api/conflicts/${b.dataset.conflict}/resolve`, { method: "POST", body: { resolution: b.dataset.resolve } });
+      toast({ supersede: "↻ New decision will replace the old one", keep: "Earlier decision stays", dismiss: "Marked as not a conflict" }[b.dataset.resolve]);
       const m = await api(`/api/meetings/${draft.id}`);
       draft.conflicts = m.conflicts;
       draft.open_conflicts = m.open_conflicts;
@@ -769,7 +796,7 @@ $("#tasks-body").addEventListener("click", async (e) => {
   try {
     await withButton(retry, "Posting…", () => api(`/api/tasks/${retry.dataset.retry}/retry`, { method: "POST" }));
   } catch (err) {
-    alert(err.message);
+    toast(esc(err.message), "error");
   }
   loadTasks();
 });
@@ -780,7 +807,7 @@ $("#tasks-body").addEventListener("change", async (e) => {
   try {
     await api(`/api/tasks/${box.dataset.done}`, { method: "PATCH", body: { status: box.checked ? "done" : "open" } });
   } catch (err) {
-    alert(err.message);
+    toast(esc(err.message), "error");
   }
   loadTasks();
 });
