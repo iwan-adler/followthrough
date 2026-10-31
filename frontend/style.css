@@ -325,3 +325,10 @@ dialog h2 { margin: 0 0 10px; font-size: 18px; }
 .live-list { display: flex; flex-direction: column; gap: 4px; }
 .live-item { font-size: 13px; }
 .tiny { font-size: 11px; }
+
+/* --- conflict impact ------------------------------------------------------------------- */
+.impact { padding: 10px 16px; border-top: 1px dashed var(--border); font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+.impact-task { padding-left: 6px; }
+.obsolete-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.obsolete-list label { display: flex; gap: 8px; align-items: baseline; font-size: 14px; flex-wrap: wrap; }
+.closed-note { color: var(--muted); margin: -2px 0 6px; }

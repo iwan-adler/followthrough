@@ -111,11 +111,15 @@ def discard_draft(meeting_id: int) -> dict:
     return {"ok": True}
 
 
+class ConfirmRequest(BaseModel):
+    close_task_ids: list[int] = []
+
+
 @app.post("/api/meetings/{meeting_id}/confirm")
-def confirm_meeting(meeting_id: int) -> dict:
+def confirm_meeting(meeting_id: int, req: ConfirmRequest | None = None) -> dict:
     _meeting_or_404(meeting_id)
     try:
-        return workflow.confirm_meeting(meeting_id)
+        return workflow.confirm_meeting(meeting_id, (req or ConfirmRequest()).close_task_ids)
     except workflow.GateError as e:
         raise HTTPException(409, str(e))
 

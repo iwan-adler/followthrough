@@ -39,13 +39,14 @@ CREATE TABLE IF NOT EXISTS action_items (
     title TEXT NOT NULL,
     owner TEXT,
     deadline TEXT,
-    status TEXT NOT NULL DEFAULT 'open',     -- open | done
+    status TEXT NOT NULL DEFAULT 'open',     -- open | done | cancelled (obsolete)
     confidence REAL NOT NULL DEFAULT 1,
     tracker TEXT,                            -- github | mock
     tracker_url TEXT,
     tracker_ref TEXT,                        -- #12 or FT-3
     tracker_error TEXT,
     completed_at TEXT,
+    closed_reason TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS conflicts (
@@ -105,7 +106,7 @@ def init_db() -> None:
         if "new_speaker" not in cols:
             conn.execute("ALTER TABLE conflicts ADD COLUMN new_speaker TEXT")
         cols = {r["name"] for r in conn.execute("PRAGMA table_info(action_items)")}
-        for col in ("tracker", "tracker_ref", "tracker_error", "completed_at"):
+        for col in ("tracker", "tracker_ref", "tracker_error", "completed_at", "closed_reason"):
             if col not in cols:
                 conn.execute(f"ALTER TABLE action_items ADD COLUMN {col} TEXT")
 

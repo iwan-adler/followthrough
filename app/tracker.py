@@ -94,5 +94,24 @@ def set_closed(item: dict, closed: bool) -> None:
             pass
 
 
+def close_obsolete(item_id: int, reason: str) -> dict:
+    """Close a task made obsolete by a superseded decision, leaving the reason on the ticket."""
+    db.execute("UPDATE action_items SET status = 'cancelled', completed_at = datetime('now'), "
+               "closed_reason = ? WHERE id = ?", (reason, item_id))
+    item = db.row("SELECT * FROM action_items WHERE id = ?", (item_id,))
+    ref = item.get("tracker_ref") or ""
+    try:
+        if item.get("tracker") == "github" and ref.startswith("#") and mode() == "github":
+            repo = settings().github_repo
+            _github("POST", f"/repos/{repo}/issues/{ref[1:]}/comments", {"body": f"Closed by Followthrough. {reason}"})
+            _github("PATCH", f"/repos/{repo}/issues/{ref[1:]}", {"state": "closed", "state_reason": "not_planned"})
+        elif ref.startswith("FT-"):
+            db.execute("UPDATE mock_tracker SET body = body || ? WHERE id = ?",
+                       (f"\n\n**Closed as obsolete.** {reason}", int(ref[3:])))
+    except Exception:  # local status already records it; tracker sync is best effort
+        pass
+    return item
+
+
 def mock_tickets() -> list[dict]:
     return db.rows("SELECT * FROM mock_tracker ORDER BY id DESC")

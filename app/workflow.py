@@ -20,7 +20,7 @@ def meeting_view(meeting_id: int) -> dict:
     m = db.get_meeting(meeting_id)
     if not m:
         raise LookupError("Meeting not found.")
-    m["conflicts"] = memory.list_conflicts(meeting_id)
+    m["conflicts"] = [{**c, "affected_tasks": memory.conflict_impact(c)} for c in memory.list_conflicts(meeting_id)]
     m["voice"] = voice_report(parse_transcript(m["transcript"]))
     m["open_conflicts"] = sum(1 for c in m["conflicts"] if not c["resolution"])
     return m
@@ -93,13 +93,19 @@ def preview(transcript: str, meeting_date: date) -> dict:
     }
 
 
-def confirm_meeting(meeting_id: int) -> dict:
-    """The confirmation gate: nothing reaches memory or the tracker before this."""
+def confirm_meeting(meeting_id: int, close_task_ids: list[int] | tuple = ()) -> dict:
+    """The confirmation gate: nothing reaches memory or the tracker before this.
+
+    close_task_ids: open tasks built on a decision this meeting supersedes, which the user
+    chose (in the confirm dialog) to close as obsolete."""
     m = meeting_view(meeting_id)
     if m["status"] == "confirmed":
         raise GateError("This meeting is already confirmed.")
     if m["open_conflicts"]:
         raise GateError(f"Resolve {m['open_conflicts']} conflict(s) with earlier decisions before confirming.")
+    closable = {t["id"]: (t, c) for c in m["conflicts"] if c["resolution"] == "supersede" for t in c["affected_tasks"]}
+    if unknown := set(close_task_ids) - set(closable):
+        raise GateError(f"Task(s) {sorted(unknown)} are not made obsolete by a superseded decision.")
     ex = Extraction.model_validate(m["extraction"])
     with db.connect() as conn:
         decision_ids = memory.commit_decisions(conn, meeting_id, ex.decisions)
@@ -114,8 +120,12 @@ def confirm_meeting(meeting_id: int) -> dict:
                      (meeting_id,))
     # Committed first, then posted: a tracker outage never loses confirmed work (retry from Tasks).
     tasks = [tracker.post(item_id, a.evidence) for item_id, a in zip(action_ids, ex.action_items)]
+    closed = [
+        tracker.close_obsolete(tid, f"Superseded in {m['title']}: “{c['new_decision']}” replaces “{c['old_text']}”.")
+        for tid, (_, c) in ((tid, closable[tid]) for tid in dict.fromkeys(close_task_ids))
+    ]
     return {"meeting_id": meeting_id, "decision_ids": decision_ids, "action_item_ids": action_ids,
-            "tracker": tracker.info(), "tasks": tasks}
+            "tracker": tracker.info(), "tasks": tasks, "closed": closed}
 
 
 def load_demo(confirm_all: bool = False) -> dict:

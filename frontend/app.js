@@ -340,6 +340,13 @@ function renderConflict(c) {
           <div class="meta">${avatar(c.new_speaker || "Unknown")} ${esc(c.new_speaker || "Unknown")}</div>
         </div>
       </div>
+      ${c.affected_tasks?.length ? `
+        <div class="impact">
+          <strong>Impact:</strong> ${c.affected_tasks.length} open task${c.affected_tasks.length === 1 ? "" : "s"} built on the earlier decision
+          ${c.affected_tasks.map((t) => `<div class="impact-task">↳ ${esc(t.title)}
+            <span class="muted small">${t.owner ? esc(t.owner) : "unassigned"}${t.tracker_ref ? ` · ${esc(t.tracker_ref)}` : ""}</span></div>`).join("")}
+          <span class="muted small">${r === "supersede" ? "You can close these as obsolete when you confirm." : "Superseding the old decision would make these obsolete."}</span>
+        </div>` : ""}
       <div class="conflict-actions">
         ${btn("supersede", "Supersede old", "primary")}
         ${btn("keep", "Keep old", "ghost")}
@@ -529,9 +536,10 @@ $("#review-body").addEventListener("click", async (e) => {
     } else if (t.closest("#confirm-btn")) {
       const btn = t.closest("#confirm-btn");
       if (dirty || savePromise) await withButton(btn, "Saving…", saveDraft);
-      if (!(await askToConfirm())) return;
+      const closeIds = await askToConfirm();
+      if (!closeIds) return;
       lastConfirm = await withButton(btn, "Posting…", () =>
-        api(`/api/meetings/${draft.id}/confirm`, { method: "POST" }));
+        api(`/api/meetings/${draft.id}/confirm`, { method: "POST", body: { close_task_ids: closeIds } }));
       reviewMeetingId = null;
       draft = null;
       refreshBadges();
@@ -574,6 +582,8 @@ async function askToConfirm() {
     keep: `“${esc(c.old_text)}” stays; “${esc(c.new_decision)}” is set aside`,
     dismiss: `“${esc(c.old_text)}” and “${esc(c.new_decision)}” both stay active`,
   }[c.resolution]));
+  const obsolete = [...new Map(draft.conflicts.filter((c) => c.resolution === "supersede")
+    .flatMap((c) => c.affected_tasks || []).map((t) => [t.id, t])).values()];
   $("#confirm-summary").innerHTML = `
     <p>This will create <strong>${items.length} task${items.length === 1 ? "" : "s"}</strong> in ${where}
        and save <strong>${decisions.length} decision${decisions.length === 1 ? "" : "s"}</strong> to team memory.</p>
@@ -582,12 +592,26 @@ async function askToConfirm() {
         <span class="muted small">${a.owner ? esc(a.owner) : "<span class='warn-text'>no owner</span>"} ·
           ${a.deadline ? fmtDate(a.deadline) : "<span class='warn-text'>no deadline</span>"}</span></li>`).join("")}</ul>` : ""}
     ${effects.length ? `<p class="small"><strong>Memory changes</strong></p><ul class="bullets small">${effects.map((e) => `<li>${e}</li>`).join("")}</ul>` : ""}
+    ${obsolete.length ? `<p class="small"><strong>Close tasks made obsolete</strong></p>
+      <div class="obsolete-list">${obsolete.map((t) => `
+        <label><input type="checkbox" data-close="${t.id}" checked> ${esc(t.title)}
+          <span class="muted small">${t.owner ? esc(t.owner) : "unassigned"}${t.tracker_ref ? ` · ${esc(t.tracker_ref)}` : ""} · ${esc(t.reason)}</span></label>`).join("")}</div>` : ""}
     <p class="muted small">Nothing has been posted yet. You can go back and edit.</p>`;
   $("#confirm-ok").textContent = items.length ? `Post ${items.length} task${items.length === 1 ? "" : "s"} & save` : "Save to memory";
   const dialog = $("#confirm-dialog");
-  dialog.returnValue = "";
   dialog.showModal();
-  return new Promise((resolve) => dialog.addEventListener("close", () => resolve(dialog.returnValue === "ok"), { once: true }));
+  // Resolves to the task ids to close (possibly empty) when confirmed, or null when cancelled.
+  // Explicit handlers rather than the dialog's close event, which some embedded browsers delay.
+  return new Promise((resolve) => {
+    const finish = (ok) => {
+      const ids = [...dialog.querySelectorAll("[data-close]:checked")].map((b) => Number(b.dataset.close));
+      dialog.close();
+      resolve(ok ? ids : null);
+    };
+    $("#confirm-ok").onclick = () => finish(true);
+    $("#confirm-cancel").onclick = () => finish(false);
+    dialog.oncancel = (e) => { e.preventDefault(); finish(false); };  // Esc
+  });
 }
 
 // Ctrl/Cmd+Enter extracts from the dictation box.
@@ -599,7 +623,7 @@ $("#m-transcript").addEventListener("keydown", (e) => {
 let lastConfirm = null;   // result of the most recent confirm, shown once as a banner
 
 function dueState(t) {
-  if (t.status === "done") return "done";
+  if (t.status !== "open") return "done";
   if (!t.deadline) return "none";
   const today = new Date(new Date().toDateString());
   const due = new Date(t.deadline + "T00:00:00");
@@ -630,10 +654,11 @@ function renderTask(t) {
   const state = dueState(t);
   return `
     <div class="item task ${state}">
-      <label class="check"><input type="checkbox" data-done="${t.id}" ${t.status === "done" ? "checked" : ""}
-        aria-label="Mark done"></label>
+      <label class="check"><input type="checkbox" data-done="${t.id}" ${t.status !== "open" ? "checked" : ""}
+        ${t.status === "cancelled" ? "disabled" : ""} aria-label="Mark done"></label>
       <div class="task-main">
         <div class="title">${esc(t.title)}</div>
+        ${t.status === "cancelled" ? `<div class="small closed-note">✕ Closed as obsolete. ${esc(t.closed_reason || "")}</div>` : ""}
         <div class="meta">
           ${t.owner ? `${avatar(t.owner)} ${esc(t.owner)}` : `<span class="badge flag">needs owner</span>`}
           ${t.deadline ? `<span class="badge due-${state}">📅 ${fmtDate(t.deadline)}</span>` : `<span class="badge flag">needs deadline</span>`}
@@ -662,14 +687,14 @@ async function loadTasks() {
       const n = lastConfirm.tasks.length;
       const posted = lastConfirm.tasks.filter((t) => t.tracker_url).length;
       const where = lastConfirm.tracker.mode === "github" ? `GitHub (${lastConfirm.tracker.repo})` : "the local mock tracker";
-      $("#tasks-banner").innerHTML = `<div class="alert ${posted === n ? "ok" : "error"}">✓ Confirmed. ${posted} of ${n} task${n === 1 ? "" : "s"} posted to ${esc(where)}.${posted < n ? " Use Retry on the ones that failed." : ""}</div>`;
+      $("#tasks-banner").innerHTML = `<div class="alert ${posted === n ? "ok" : "error"}">✓ Confirmed. ${posted} of ${n} task${n === 1 ? "" : "s"} posted to ${esc(where)}.${posted < n ? " Use Retry on the ones that failed." : ""}${lastConfirm.closed?.length ? ` Closed ${lastConfirm.closed.length} obsolete task${lastConfirm.closed.length === 1 ? "" : "s"}.` : ""}</div>`;
       lastConfirm = null;
     } else {
       $("#tasks-banner").innerHTML = "";
     }
 
     const status = $("#tasks-status").value;
-    const tasks = all.filter((t) => (!ownerSel.value || t.owner === ownerSel.value) && (!status || t.status === status));
+    const tasks = all.filter((t) => (!ownerSel.value || t.owner === ownerSel.value) && (!status || (status === "open" ? t.status === "open" : t.status !== "open")));
     if (!tasks.length) {
       body.innerHTML = `<div class="empty">${all.length ? "No tasks match these filters." : "No tasks yet. Confirm a meeting to create them."}</div>`;
       return;

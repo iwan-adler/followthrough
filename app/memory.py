@@ -193,16 +193,33 @@ def stale_task_reasons(tasks: list[dict]) -> dict[int, str]:
         "WHERE o.status = 'superseded'")
     reasons: dict[int, str] = {}
     for r in replaced:
-        old_v, new_v = _values(r["old_text"]), _values(r["new_text"])
-        for cls, olds in old_v.items():
-            for norm, disp in olds.items():
-                if norm in new_v.get(cls, {}):
-                    continue
-                now = ", ".join(new_v.get(cls, {}).values()) or "something else"
-                for t in tasks:
-                    if t["status"] == "open" and t["id"] not in reasons and disp.lower() in t["title"].lower():
-                        reasons[t["id"]] = f"mentions {disp}, which {r['meeting_title']} replaced with {now}"
+        for t, dropped, now in _tasks_mentioning_dropped(r["old_text"], r["new_text"], tasks):
+            reasons.setdefault(t["id"], f"mentions {dropped}, which {r['meeting_title']} replaced with {now}")
     return reasons
+
+
+def _tasks_mentioning_dropped(old_text: str, new_text: str, tasks: list[dict]):
+    """Yield (task, dropped value, replacement) for open tasks naming a value the new decision drops."""
+    old_v, new_v = _values(old_text), _values(new_text)
+    for cls, olds in old_v.items():
+        for norm, disp in olds.items():
+            if norm in new_v.get(cls, {}):
+                continue
+            now = ", ".join(new_v.get(cls, {}).values()) or "something else"
+            for t in tasks:
+                if t["status"] == "open" and disp.lower() in t["title"].lower():
+                    yield t, disp, now
+
+
+def conflict_impact(conflict: dict) -> list[dict]:
+    """Open tasks built on the old decision, which superseding it would make obsolete."""
+    tasks = db.rows("SELECT id, title, owner, status, tracker_ref, tracker_url FROM action_items WHERE status = 'open'")
+    seen, out = set(), []
+    for t, dropped, now in _tasks_mentioning_dropped(conflict["old_text"], conflict["new_decision"], tasks):
+        if t["id"] not in seen:
+            seen.add(t["id"])
+            out.append({**t, "reason": f"mentions {dropped}; the new decision says {now}"})
+    return out
 
 
 # --- detection & resolution --------------------------------------------------------------
