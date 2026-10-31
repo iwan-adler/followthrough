@@ -2,9 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "followthrough",
-      "runtimeExecutable": ".venv/Scripts/python.exe",
-      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--port", "8000", "--reload"],
+      "name": "followthrough-app",
+      "runtimeExecutable": "C:\\Users\\rosiw\\Desktop\\Hackathon Projects\\Agentic-AI\\.venv\\Scripts\\python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--port", "8000", "--reload",
+                      "--app-dir", "C:\\Users\\rosiw\\Desktop\\Hackathon Projects\\Agentic-AI"],
+      "cwd": "C:\\Users\\rosiw\\Desktop\\Hackathon Projects\\Agentic-AI",
+      "env": { "DB_PATH": "C:\\Users\\rosiw\\Desktop\\Hackathon Projects\\Agentic-AI\\followthrough.db" },
       "port": 8000
     }
   ]

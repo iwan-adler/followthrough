@@ -296,3 +296,32 @@ dialog h2 { margin: 0 0 10px; font-size: 18px; }
 .confirm-list { list-style: none; padding: 0; margin: 10px 0; max-height: 240px; overflow: auto; border: 1px solid var(--border); border-radius: 10px; }
 .confirm-list li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 14px; }
 .confirm-list li:last-child { border-bottom: 0; }
+
+/* --- live dictation panel ------------------------------------------------------------- */
+.dictate-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: stretch; }
+.dictate-grid .field { margin-bottom: 0; }
+.dictate-grid textarea { height: 100%; }
+@media (max-width: 860px) { .dictate-grid { grid-template-columns: 1fr; } }
+.live-panel {
+  margin-top: 25px; border: 1px dashed var(--border); border-radius: 12px; padding: 14px;
+  background: var(--surface-2); display: flex; flex-direction: column; gap: 10px; min-height: 200px;
+  transition: border-color .2s;
+}
+.live-panel.active { border-style: solid; border-color: var(--accent); }
+.live-panel p { margin: 0; }
+.live-head { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
+.live-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+.live-dot.on { background: var(--danger); animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(194, 51, 77, .5); } 50% { box-shadow: 0 0 0 6px rgba(194, 51, 77, 0); } }
+.live-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.live-stat { display: flex; flex-direction: column; align-items: center; background: var(--surface); border-radius: 8px; padding: 6px 2px; }
+.live-stat strong { font-size: 18px; line-height: 1.2; }
+.live-stat span { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.live-conflict { background: var(--danger-soft); color: var(--danger); border-radius: 8px; padding: 8px 10px; font-size: 13px; animation: pop .25s ease-out; }
+.live-conflict .small { color: var(--text); margin-top: 2px; }
+@keyframes pop { from { transform: scale(.97); opacity: 0; } to { transform: none; opacity: 1; } }
+.corrections.compact { margin: 0; }
+.corrections.compact li { font-size: 13px; }
+.live-list { display: flex; flex-direction: column; gap: 4px; }
+.live-item { font-size: 13px; }
+.tiny { font-size: 11px; }

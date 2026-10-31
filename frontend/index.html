@@ -55,11 +55,18 @@
           </label>
         </div>
 
-        <label class="field">
-          <span>Transcript or recap</span>
-          <textarea id="m-transcript" rows="14"
-            placeholder="Dictate your meeting recap here…&#10;&#10;Priya: um so we're launching Friday… no wait, Monday the 17th.&#10;Raj: I'll draft the migration plan by next Friday."></textarea>
-        </label>
+        <div class="dictate-grid">
+          <label class="field">
+            <span>Transcript or recap</span>
+            <textarea id="m-transcript" rows="14"
+              placeholder="Dictate your meeting recap here…&#10;&#10;Priya: um so we're launching Friday… no wait, Monday the 17th.&#10;Raj: I'll draft the migration plan by next Friday."></textarea>
+          </label>
+          <aside id="live-panel" class="live-panel" aria-live="polite">
+            <div class="live-head"><span class="live-dot"></span> Listening</div>
+            <p class="muted small">Start talking. Decisions, tasks, self-corrections and conflicts with past
+              meetings appear here as you speak.</p>
+          </aside>
+        </div>
         <p class="hint">🎙️ Hold your <strong>Wispr Flow</strong> hotkey and just talk — filler words and
           self-corrections are fine. Start lines with <code>Name:</code> to attribute speakers;
           unlabeled text is attributed to <em>Unknown</em>.</p>

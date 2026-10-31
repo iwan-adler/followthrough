@@ -6,8 +6,8 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from . import db, digest, llm, memory, tracker
-from .extraction import Extraction, extract, postprocess
-from .speech import parse_transcript, voice_report
+from .extraction import Extraction, extract, mock_extract, postprocess
+from .speech import parse_transcript, speakers, voice_report
 
 SEED_DIR = Path(__file__).resolve().parent.parent / "seed"
 
@@ -67,6 +67,30 @@ def discard_draft(meeting_id: int) -> None:
     with db.connect() as conn:
         conn.execute("DELETE FROM conflicts WHERE meeting_id = ?", (meeting_id,))
         conn.execute("DELETE FROM meetings WHERE id = ?", (meeting_id,))
+
+
+def preview(transcript: str, meeting_date: date) -> dict:
+    """Instant, side-effect-free read of a transcript while it is being dictated.
+
+    Uses only the deterministic rules (no LLM call, so it can run on every pause in speech)
+    and checks the decisions it hears against memory, so a contradiction shows up live."""
+    utterances = parse_transcript(transcript)
+    if not utterances:
+        return {"speakers": [], "voice": voice_report([]), "decisions": [], "action_items": [], "conflicts": []}
+    ex = postprocess(mock_extract(utterances, meeting_date), utterances, meeting_date, digest.people())
+    actives = memory.active_decisions()
+    pairs = [(i, d, old) for i, d in enumerate(ex.decisions) for old in memory.candidates(d, actives)]
+    flagged = [j for j in memory.mock_judge(pairs).judgments if j.verdict != "none"] if pairs else []
+    olds = {old["id"]: old for _, _, old in pairs}
+    return {
+        "speakers": speakers(utterances),
+        "voice": voice_report(utterances),
+        "decisions": [{"text": d.text, "topic": d.topic, "speaker": d.speaker} for d in ex.decisions],
+        "action_items": [{"title": a.title, "owner": a.owner, "deadline": a.deadline} for a in ex.action_items],
+        "conflicts": [{"new_decision": ex.decisions[j.new_index].text, "old_text": olds[j.old_id]["text"],
+                       "old_meeting_title": olds[j.old_id]["meeting_title"], "kind": j.verdict,
+                       "explanation": j.explanation} for j in flagged],
+    }
 
 
 def confirm_meeting(meeting_id: int) -> dict:

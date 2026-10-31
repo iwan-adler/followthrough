@@ -66,6 +66,17 @@ def extract_meeting(req: ExtractRequest) -> dict:
     return workflow.stage_meeting(req.transcript, req.meeting_date, req.title)
 
 
+class PreviewRequest(BaseModel):
+    transcript: str = ""
+    meeting_date: date = Field(default_factory=date.today)
+
+
+@app.post("/api/preview")
+def preview(req: PreviewRequest) -> dict:
+    """Live read while dictating: deterministic, instant, saves nothing."""
+    return workflow.preview(req.transcript, req.meeting_date)
+
+
 @app.get("/api/meetings")
 def list_meetings() -> list[dict]:
     return db.rows("SELECT id, title, meeting_date, status, summary, created_at FROM meetings ORDER BY id DESC")

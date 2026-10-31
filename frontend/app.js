@@ -101,6 +101,7 @@ $("#m-file").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
   $("#m-transcript").value = await file.text();
+  schedulePreview();
   $("#m-file-name").textContent = file.name;
   if (!$("#m-title").value) $("#m-title").value = file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
 });
@@ -123,6 +124,7 @@ $("#m-extract").addEventListener("click", async (e) => {
       }));
     reviewMeetingId = data.id;
     $("#m-transcript").value = "";
+    schedulePreview();
     $("#m-title").value = "";
     showTab("review");
   } catch (err) {
@@ -152,10 +154,65 @@ $("#demo-sample").addEventListener("click", async () => {
     $("#m-title").value = s.title;
     $("#m-date").value = s.meeting_date;
     $("#m-transcript").value = s.transcript;
+    schedulePreview();
   } catch (err) {
     showNewError(err.message);
   }
 });
+
+// --- Live dictation preview ------------------------------------------------------------
+let previewTimer = null;
+let previewSeq = 0;
+
+function schedulePreview() {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(runPreview, 450);
+}
+
+async function runPreview() {
+  const transcript = $("#m-transcript").value;
+  const seq = ++previewSeq;
+  if (!transcript.trim()) return renderLive(null);
+  try {
+    const p = await api("/api/preview", { method: "POST", body: { transcript, meeting_date: $("#m-date").value } });
+    if (seq === previewSeq) renderLive(p);  // ignore stale responses
+  } catch { /* preview is best effort */ }
+}
+
+function renderLive(p) {
+  const panel = $("#live-panel");
+  if (!p) {
+    panel.classList.remove("active");
+    panel.innerHTML = `<div class="live-head"><span class="live-dot"></span> Listening</div>
+      <p class="muted small">Start talking. Decisions, tasks, self-corrections and conflicts with past
+      meetings appear here as you speak.</p>`;
+    return;
+  }
+  panel.classList.add("active");
+  const v = p.voice;
+  const stat = (n, label) => `<div class="live-stat"><strong>${n}</strong><span>${label}</span></div>`;
+  panel.innerHTML = `
+    <div class="live-head"><span class="live-dot on"></span> Hearing ${p.speakers.length} speaker${p.speakers.length === 1 ? "" : "s"}</div>
+    <div class="live-stats">
+      ${stat(p.decisions.length, "decisions")}
+      ${stat(p.action_items.length, "tasks")}
+      ${stat(v.corrections.length, "corrections")}
+      ${stat(v.filler_words, "fillers cut")}
+    </div>
+    ${p.conflicts.map((c) => `
+      <div class="live-conflict">
+        <strong>⚠ Contradicts ${esc(c.old_meeting_title)}</strong>
+        <div class="small">${esc(c.explanation)}</div>
+      </div>`).join("")}
+    ${v.corrections.length ? `<ul class="corrections compact">${v.corrections.slice(-4).map((c) =>
+      `<li><del>${esc(c.said)}</del> → <ins>${esc(c.meant)}</ins></li>`).join("")}</ul>` : ""}
+    ${p.action_items.length ? `<div class="live-list">${p.action_items.slice(-5).map((a) => `
+      <div class="live-item">☐ ${esc(a.title)} <span class="muted">${a.owner ? "· " + esc(a.owner) : ""}${a.deadline ? " · " + fmtDate(a.deadline) : ""}</span></div>`).join("")}</div>` : ""}
+    <p class="muted tiny">Instant local read. <strong>Extract</strong> runs the full AI pass.</p>`;
+}
+
+$("#m-transcript").addEventListener("input", schedulePreview);
+$("#m-date").addEventListener("change", schedulePreview);
 
 // --- Review (editable draft + confirmation gate) ---------------------------------------
 let reviewMeetingId = null;

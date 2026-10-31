@@ -85,9 +85,16 @@ _HEDGES = re.compile(r"\b(probably|maybe|i think|tentatively|might|for now|rough
 _SELF_OWNER = re.compile(r"\b(i'?ll|i will|i can|i'?m going to|i'?m gonna|let me|i'?ll take|i'?ll own)\b", re.I)
 _ASKED_OWNER = re.compile(r"\b([A-Z][a-z]+),? (?:can you|could you|would you|please|will you)\b")
 _NAMED_OWNER = re.compile(r"\b([A-Z][a-z]+) (?:will|is going to|to|should|needs to|can|owns|is on|takes)\b")
+# Recap-style dictation: "Diego said he'll write the rules", "Mei volunteered to send it".
+_REPORTED_OWNER = re.compile(
+    r"\b([A-Z][a-z]+) (?:said|says|mentioned|promised|offered|agreed|volunteered|committed)"
+    r"(?: that)?(?: (?:he|she|they)(?:'ll| will| would|'d| is going to| can)| to)\b"
+)
+_REPORTED_SPEAKER = re.compile(r"([A-Z][a-z]+) (?:said|says|mentioned|announced|confirmed|decided)(?: that)? ")
 _ACTION_CUES = re.compile(
     r"\b(i'?ll|i will|i can|i'?m going to|let me|can you|could you|please|needs to|will|should|"
-    r"action item|to-?do|follow up|make sure|take care of|owns|is on)\b",
+    r"action item|to-?do|follow up|make sure|take care of|owns|is on|"
+    r"he'?ll|she'?ll|they'?ll|offered to|volunteered to|promised to|agreed to|committed to)\b",
     re.I,
 )
 _NOT_NAMES = {"We", "I", "It", "That", "This", "There", "They", "You", "Someone", "Somebody",
@@ -104,6 +111,8 @@ def _owner_for(sentence: str, speaker: str, people: set[str]) -> str | None:
         found.append((m.start(), m[1]))
     if m := _SELF_OWNER.search(sentence):
         found.append((m.start(), None if speaker == UNKNOWN else speaker))
+    if (m := _REPORTED_OWNER.search(sentence)) and m[1] not in _NOT_NAMES:
+        found.append((m.start(), m[1]))
     return min(found, key=lambda f: f[0])[1] if found else None
 
 
@@ -114,7 +123,7 @@ def _task_title(sentence: str, owner: str | None, date_phrase: str | None) -> st
         t = t.replace(date_phrase, " ")
     t = re.sub(
         r"^.*?\b(?:i'?ll|i will|i can|i'?m going to|i'?m gonna|let me|can you|could you|would you|"
-        r"will you|please|will|is going to|needs to|should|to)\b\s*",
+        r"will you|please|he'?ll|she'?ll|they'?ll|will|is going to|needs to|should|to)\b\s*",
         "", t, count=1, flags=re.I,
     ) or t
     if owner:
@@ -146,8 +155,11 @@ def mock_extract(utterances: list[Utterance], meeting_date: date) -> Extraction:
             hedged = bool(_HEDGES.search(sentence))
             if _DECISION_CUES.search(sentence):
                 conf = 0.9 if _STRONG_CUES.search(sentence) else 0.75
+                who, said = u.speaker, sentence
+                if (m := _REPORTED_SPEAKER.match(sentence)) and m[1] not in _NOT_NAMES:
+                    who, said = m[1], sentence[m.end():]  # "Priya said the launch is..."
                 decisions.append(ExtractedDecision(
-                    text=_decision_text(sentence), topic=guess_topic(sentence), speaker=u.speaker,
+                    text=_decision_text(said), topic=guess_topic(sentence), speaker=who,
                     confidence=round(conf - (0.2 if hedged else 0), 2), evidence=sentence,
                 ))
                 continue

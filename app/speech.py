@@ -42,8 +42,12 @@ def normalize_transcript(text: str) -> str:
             continue
         if m := _VTT_VOICE_RE.search(s):
             s = f"{m[1].strip()}: {m[2].strip()}"
-        out.append(s)
+        # Dictation arrives as one paragraph: "...December 7th now. Diego: I'll write..."
+        out.extend(_INLINE_SPEAKER_RE.sub("\n", s).split("\n"))
     return "\n".join(out)
+
+
+_INLINE_SPEAKER_RE = re.compile(r"(?<=[.!?…])\s+(?=[A-Z][a-z]+(?: [A-Z][a-z]+)?:\s)")
 
 
 def parse_transcript(text: str) -> list[Utterance]:
