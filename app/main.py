@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import ask, db, digest, llm, memory, reminders, tracker, workflow
+from .config import SERVERLESS
 from .extraction import Extraction
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
@@ -21,7 +22,8 @@ FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 async def lifespan(_: FastAPI):
     db.init_db()
     reminders.start()
-    threading.Thread(target=llm.warm_up, daemon=True).start()
+    if not SERVERLESS:  # serverless functions freeze between requests; a background probe is wasted
+        threading.Thread(target=llm.warm_up, daemon=True).start()
     yield
     reminders.stop()
 
@@ -329,5 +331,6 @@ def load_demo() -> dict:
     return workflow.load_demo()
 
 
-# Mounted last so /api routes win.
-app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+# Mounted last so /api routes win. Guarded so a deploy that leaves the UI out still serves the API.
+if FRONTEND_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

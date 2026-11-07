@@ -1,0 +1,9 @@
+.venv/
+.env
+*.db
+brag-output/
+tests/
+eval/
+.pytest_cache/
+__pycache__/
+.claude/

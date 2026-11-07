@@ -1,10 +1,15 @@
 """Settings from environment / .env. Read on every call so tests can monkeypatch env vars."""
 import os
+import tempfile
 from dataclasses import dataclass
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Serverless hosts (Vercel) have a read-only code directory and no long-lived process:
+# keep the database in the temp folder and don't start a background scheduler.
+SERVERLESS = bool(os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
 
 
 @dataclass(frozen=True)
@@ -35,7 +40,15 @@ def settings() -> Settings:
         github_token=env("GITHUB_TOKEN", "").strip(),
         github_repo=env("GITHUB_REPO", "").strip(),
         github_user_map=env("GITHUB_USER_MAP", ""),
-        db_path=env("DB_PATH", "followthrough.db"),
+        db_path=_db_path(env("DB_PATH") or "followthrough.db"),
         reminder_interval_minutes=int(env("REMINDER_INTERVAL_MINUTES", "15")),
-        scheduler_enabled=env("SCHEDULER_ENABLED", "true").strip().lower() not in ("0", "false", "no"),
+        scheduler_enabled=not SERVERLESS and env("SCHEDULER_ENABLED", "true").strip().lower() not in ("0", "false", "no"),
     )
+
+
+def _db_path(path: str) -> str:
+    """On serverless only the temp dir is writable, so a relative path is placed there
+    (even one copied from .env.example); an absolute path is used as given."""
+    if SERVERLESS and not os.path.isabs(path):
+        return os.path.join(tempfile.gettempdir(), path)
+    return path

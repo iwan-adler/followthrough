@@ -89,12 +89,22 @@ CREATE TABLE IF NOT EXISTS mock_tracker (
 """
 
 
+_ready: set[str] = set()  # database files whose schema this process has already ensured
+
+
 @contextmanager
 def connect() -> Iterator[sqlite3.Connection]:
-    conn = sqlite3.connect(settings().db_path)
+    path = settings().db_path
+    conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     try:
+        # Create the schema on first use, not only at startup: serverless hosts may never
+        # send the app its startup event.
+        if path not in _ready:
+            _ensure_schema(conn)
+            conn.commit()
+            _ready.add(path)
         yield conn
         conn.commit()
     finally:
@@ -103,17 +113,21 @@ def connect() -> Iterator[sqlite3.Connection]:
 
 def init_db() -> None:
     with connect() as conn:
-        conn.executescript(SCHEMA)
-        # Columns added after the first schema version, for databases created earlier.
-        cols = {r["name"] for r in conn.execute("PRAGMA table_info(conflicts)")}
-        if "new_decision_index" not in cols:
-            conn.execute("ALTER TABLE conflicts ADD COLUMN new_decision_index INTEGER NOT NULL DEFAULT 0")
-        if "new_speaker" not in cols:
-            conn.execute("ALTER TABLE conflicts ADD COLUMN new_speaker TEXT")
-        cols = {r["name"] for r in conn.execute("PRAGMA table_info(action_items)")}
-        for col in ("tracker", "tracker_ref", "tracker_error", "completed_at", "closed_reason"):
-            if col not in cols:
-                conn.execute(f"ALTER TABLE action_items ADD COLUMN {col} TEXT")
+        _ensure_schema(conn)
+
+
+def _ensure_schema(conn: sqlite3.Connection) -> None:
+    conn.executescript(SCHEMA)
+    # Columns added after the first schema version, for databases created earlier.
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(conflicts)")}
+    if "new_decision_index" not in cols:
+        conn.execute("ALTER TABLE conflicts ADD COLUMN new_decision_index INTEGER NOT NULL DEFAULT 0")
+    if "new_speaker" not in cols:
+        conn.execute("ALTER TABLE conflicts ADD COLUMN new_speaker TEXT")
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(action_items)")}
+    for col in ("tracker", "tracker_ref", "tracker_error", "completed_at", "closed_reason"):
+        if col not in cols:
+            conn.execute(f"ALTER TABLE action_items ADD COLUMN {col} TEXT")
 
 
 def reset() -> None:
