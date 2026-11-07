@@ -1,5 +1,7 @@
 # Followthrough
 
+🎥 **[Watch the demo video](https://github.com/iwan-adler/followthrough/releases/download/v1.0/brag.mp4)** (21 s) · Built for the Agentic AI Hackathon '26 by Product Space
+
 **Meeting-to-execution agent.** Dictate or paste a meeting, and Followthrough turns it into
 tracked work: decisions, action items with owners and deadlines, GitHub issues, reminders and a
 weekly digest per person. It also **catches decisions that quietly contradict earlier ones**,
