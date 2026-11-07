@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
+  "fluid": true,
   "functions": {
     "api/index.py": {
       "includeFiles": "{app,frontend,seed}/**",
